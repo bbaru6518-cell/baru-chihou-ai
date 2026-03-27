@@ -38,8 +38,11 @@ with col2:
             st.error("入力不足です（APIキーとデータを入力してください）")
         else:
             try:
+                # --- API設定（最もシンプルな接続方式） ---
                 genai.configure(api_key=api_key)
-                model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+                
+                # モデル指定を最もエラーが起きにくい形式に変更
+                model = genai.GenerativeModel("gemini-1.5-flash")
                 
                 prompt = f"""
                 あなたは競馬AI総監督Baruの右腕だ。
@@ -62,13 +65,14 @@ with col2:
                 """
                 
                 with st.spinner("地方の深い砂と展開を読み解き中..."):
+                    # 安全に生成を実行
                     res = model.generate_content(prompt)
                     st.success("✅ 地方解析完了。砂の適性と先行力を完全に見抜きました。")
                     st.markdown("---")
                     st.markdown(res.text)
             except Exception as e:
-                st.error(f"解析エラーが発生しました。詳細: {e}")
-
-    st.button("🧹 データをクリア", on_click=reset_data)
-
-st.caption("Baru Stable AI System v5.0 - 地方競馬・砂質攻略ロジック")
+                # 万が一エラーが出た場合、別のモデル名での接続を試みる自動リトライ機能
+                try:
+                    model_alt = genai.GenerativeModel("models/gemini-1.5-flash")
+                    res = model_alt.generate_content(prompt)
+                    st.success("✅ 地方解析完了（リトライ成功）。
