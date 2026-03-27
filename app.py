@@ -38,42 +38,37 @@ with col2:
             st.error("入力不足です")
         else:
             try:
-                # --- API設定の最安定化 ---
                 genai.configure(api_key=api_key)
                 
-                # 404エラーを回避するための標準指定
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                # --- 修正ポイント：利用可能なモデルを順番に試す ---
+                success = False
+                # 試行するモデルのリスト（最新から順に）
+                model_names = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
                 
-                prompt = f"""
-                あなたは競馬AI総監督Baruの右腕だ。
-                地方競馬特有の【砂質・小回り・先行バイアス】に基づき、結論を出せ。
-                
-                【対象データ】: {data}
-                【総監督バイアス】: {bias}
-                
-                以下の5項目で出力せよ：
-                1.★地方・砂の王(POWER-AXIS): 地方特有の砂に強い大型馬、または逃げ馬を指名。
-                2.小回り内枠・先行の絶対優位: 前に行ける馬を評価。
-                3.移籍・勝負気配の察知: 移籍初戦やリーディング騎手への乗り替え。
-                4.全頭診断: 1行ずつ。馬番、馬名、砂適性と位置予測。
-                5.買い目: 逃げ・先行馬軸。爆穴を1頭含める。
+                prompt = f"""競馬AI総監督Baruの右腕として結論を出せ。
+                【データ】: {data}
+                【バイアス】: {bias}
+                1.砂の王(POWER-AXIS) 2.先行優位 3.移籍/勝負気配 4.全頭診断 5.買い目
                 """
-                
-                with st.spinner("砂の適性を解析中..."):
-                    # 呼び出し方式を最もシンプルな形に
-                    response = model.generate_content(prompt)
-                    st.success("✅ 地方解析完了。")
-                    st.markdown("---")
-                    st.markdown(response.text)
+
+                for m_name in model_names:
+                    try:
+                        model = genai.GenerativeModel(m_name)
+                        with st.spinner(f"モデル {m_name} で解析中..."):
+                            response = model.generate_content(prompt)
+                            st.success(f"✅ 解析完了 (使用モデル: {m_name})")
+                            st.markdown("---")
+                            st.markdown(response.text)
+                            success = True
+                            break # 成功したらループを抜ける
+                    except Exception as inner_e:
+                        continue # 失敗したら次のモデルを試す
+
+                if not success:
+                    st.error("利用可能なGeminiモデルが見つかりませんでした。APIキーが有効か、またはGoogle AI Studioでモデルの権限を確認してください。")
+
             except Exception as e:
-                # エラーが出た場合、旧名称の 'gemini-pro' で最後の悪あがき（リトライ）
-                try:
-                    model_alt = genai.GenerativeModel('gemini-pro')
-                    response = model_alt.generate_content(prompt)
-                    st.success("✅ 解析成功（代替モデル使用）")
-                    st.markdown(response.text)
-                except:
-                    st.error(f"解析エラー: {e}")
+                st.error(f"致命的なエラー: {e}")
 
     st.button("🧹 データをクリア", on_click=reset_data)
 
