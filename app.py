@@ -35,37 +35,34 @@ with col1:
 with col2:
     if st.button("🚀 地方砂質・先行ジャッジ"):
         if not api_key or not data:
-            st.error("入力不足です")
+            st.error("入力不足です（APIキーとデータを入力してください）")
         else:
             try:
+                # --- 最新のGemini接続設定 ---
                 genai.configure(api_key=api_key)
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                # モデル名を最新の安定形式に修正
+                model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
                 
                 prompt = f"""
-                競馬AI総監督Baruとして、地方競馬特有の【砂質・小回り・先行バイアス】に基づき結論を出せ。
-                【データ】: {data}
-                【バイアス】: {bias}
+                あなたは競馬AI総監督Baruの右腕だ。
+                地方競馬特有の【砂質・小回り・先行バイアス】に基づき、人気に惑わされず結論を出せ。
                 
+                【対象データ】: {data}
+                【総監督バイアス】: {bias}
+                
+                以下の5項目で出力せよ：
                 1.★地方・砂の王(POWER-AXIS): 
-                   - 地方特有のタフな砂を苦にしない大型馬、または小回りを逃げ切れる快速馬を軸に据えよ。
+                   - 地方特有のタフな砂を苦にしない大型馬(480kg〜)、または小回りを逃げ切れる快速馬を軸に指名。
                 2.小回り内枠・先行の絶対優位: 
-                   - 最初のコーナーを3番手以内で回れる馬を評価の中心に置け。
+                   - 最初のコーナーを3番手以内で回れる馬を評価の中心に置く。
                 3.移籍・勝負気配の察知: 
-                   - 中央からの移籍初戦や、地元リーディング騎手への乗り替わりなどの「ヤリ」を敏感に察知せよ。
-                4.全頭診断: 1行。馬番、馬名、そして「砂の適性と、最初のコーナーでの位置取り予測」を書け。
+                   - 中央からの移籍初戦や、地元リーディング騎手への乗り替え等の「ヤリ」を察知。
+                4.全頭診断: 1行ずつ。馬番、馬名、そして「砂の適性と、最初のコーナーでの位置取り予測」。
                 5.買い目: 
                    - 逃げ・先行馬を軸にした「馬複・ワイド・3連複」。
-                   - 紛れが少ないため点数は絞りつつ、爆穴を1頭だけ3列目に必ず入れよ。
+                   - 紛れが少ないため点数は絞りつつ、爆穴を1頭だけ3列目に必ず入れること。
                 """
                 
                 with st.spinner("地方の深い砂と展開を読み解き中..."):
                     res = model.generate_content(prompt)
-                    st.success("✅ 地方解析完了。砂の適性と先行力を完全に見抜きました。")
-                    st.markdown("---")
-                    st.markdown(res.text)
-            except Exception as e:
-                st.error(f"エラー: {e}")
-
-    st.button("🧹 データをクリア", on_click=reset_data)
-
-st.caption("Baru Stable AI System v5.0 - 地方競馬・砂質攻略ロジック")
+                    st.success
