@@ -16,7 +16,7 @@ def load_cfg():
 
 cfg = load_cfg()
 st.set_page_config(page_title="Baru 競馬AI", layout="wide")
-st.title("🏇 Baru 競馬AI - 【404エラー完全解決版】")
+st.title("🏇 Baru 競馬AI - 【最新規格対応・解決版】")
 
 with st.sidebar:
     st.header("⚙️ 設定")
@@ -35,42 +35,39 @@ with col2:
             st.error("APIキーとデータを入力してください")
         else:
             try:
+                # API設定
                 genai.configure(api_key=api_key)
                 
-                # --- 404エラーを力技で突破する【全パターン試行】ロジック ---
-                # Google APIが認識する可能性のある全モデル名リスト
-                test_models = [
-                    "models/gemini-1.5-flash",
-                    "gemini-1.5-flash",
-                    "models/gemini-pro",
-                    "gemini-pro"
-                ]
-                
-                prompt = f"あなたは競馬AI総監督Baruの右腕だ。以下のデータから地方砂質・先行バイアスに基づき結論を出せ。\n\nバイアス: {bias}\n\nデータ: {data}"
-                
-                success = False
-                with st.spinner("最適な接続経路を探しています..."):
-                    for m_name in test_models:
-                        try:
-                            model = genai.GenerativeModel(m_name)
+                # --- 【解決策】利用可能なモデルを直接リストアップして、動くものを自動選択 ---
+                with st.spinner("接続経路を自動判別中..."):
+                    try:
+                        # 404を回避するため、まず利用可能なモデル名をGoogleに問い合わせる
+                        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                        
+                        # 優先順位：1.5-flash -> 1.5-pro -> その他
+                        target_model = None
+                        for m in available_models:
+                            if "1.5-flash" in m:
+                                target_model = m
+                                break
+                        if not target_model and available_models:
+                            target_model = available_models[0]
+                            
+                        if target_model:
+                            model = genai.GenerativeModel(target_model)
+                            prompt = f"バイアス: {bias}\n\nデータ: {data}"
                             response = model.generate_content(prompt)
-                            st.success(f"✅ 通信成功！ (使用モデル: {m_name})")
+                            
+                            st.success(f"✅ 通信成功！ (使用モデル: {target_model})")
                             st.markdown("---")
                             st.markdown(response.text)
-                            success = True
-                            break # 成功したらループを抜ける
-                        except Exception as e:
-                            # 404以外のエラー（キーの間違いなど）が出た場合は即座に報告
-                            if "API_KEY_INVALID" in str(e):
-                                st.error("APIキーが間違っているようです。もう一度コピーし直してください。")
-                                success = True # ループを止めるため
-                                break
-                            continue # 404なら次のモデル名へ
-                
-                if not success:
-                    st.error("Googleのサーバーがモデルを認識できません。APIキーを作成した『プロジェクト』が有効か、Google AI StudioのChat画面で動作するか確認してください。")
+                        else:
+                            st.error("利用可能なモデルが見つかりません。APIキーの権限を確認してください。")
+                            
+                    except Exception as inner_e:
+                        st.error(f"接続に失敗しました。APIキーが間違っているか、有効化されていません。\n詳細: {inner_e}")
 
             except Exception as e:
                 st.error(f"システムエラー: {e}")
 
-st.caption("Baru Stable AI System v7.0 - Error-Free Edition")
+st.caption("Baru Stable AI System v8.0 - Auto-Selection Edition")
