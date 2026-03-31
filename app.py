@@ -38,28 +38,31 @@ with col2:
             st.error("入力不足です")
         else:
             try:
-                # --- 修正ポイント：API設定 ---
                 genai.configure(api_key=api_key)
-                
-                # 404エラーを回避するため、models/ を付けない標準形式に固定
-                model = genai.GenerativeModel("gemini-1.5-flash")
-                
                 prompt = f"競馬AI総監督Baruの右腕として、以下のデータから【地方砂質・先行バイアス】に基づき結論を出せ。\n\nデータ: {data}\nバイアス: {bias}"
                 
-                with st.spinner("解析中..."):
-                    # 安全な呼び出し
-                    response = model.generate_content(prompt)
-                    st.success("✅ 解析完了")
-                    st.markdown("---")
-                    st.markdown(response.text)
+                # --- 【最重要】404エラーを力技で突破するリトライループ ---
+                success = False
+                # 試行するモデル名の全パターン
+                model_variants = ["gemini-1.5-flash", "models/gemini-1.5-flash", "gemini-pro", "models/gemini-pro"]
+                
+                with st.spinner("あらゆる接続経路を試行中..."):
+                    for m_name in model_variants:
+                        try:
+                            model = genai.GenerativeModel(m_name)
+                            response = model.generate_content(prompt)
+                            st.success(f"✅ 解析完了 (接続成功: {m_name})")
+                            st.markdown("---")
+                            st.markdown(response.text)
+                            success = True
+                            break # 成功したらループ終了
+                        except Exception:
+                            continue # 失敗したら次のパターンへ
+                
+                if not success:
+                    st.error("全接続パターンが拒否されました。APIキーが『新しいプロジェクト』で作られたものか、再度ご確認ください。")
+
             except Exception as e:
-                # もし gemini-1.5-flash がダメな場合の最終バックアップ
-                try:
-                    model_alt = genai.GenerativeModel("gemini-pro")
-                    response = model_alt.generate_content(prompt)
-                    st.success("✅ 解析完了 (Backup Model)")
-                    st.markdown(response.text)
-                except Exception as e2:
-                    st.error(f"エラーが発生しました。APIキーを確認してください。\n詳細: {e2}")
+                st.error(f"致命的なエラーが発生しました: {e}")
 
     st.button("🧹 データをクリア", on_click=reset_data)
