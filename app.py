@@ -18,7 +18,7 @@ def load_cfg():
 
 cfg = load_cfg()
 st.set_page_config(page_title="Baru 競馬AI Pro 18", layout="wide")
-st.title("🏇 Baru 競馬AI Pro - 【勝率予測＆1軸4頭流し完全版】")
+st.title("🏇 Baru 競馬AI Pro - 【勝率予測＆最新エンジン搭載版】")
 
 # --- スクレイピング関数 ---
 def get_netkeiba_data(url):
@@ -66,43 +66,40 @@ with col1:
     manual_data = st.text_area("✍️ 馬柱データを貼り付け", height=500, key="manual_field")
     
     if st.button("🚀 勝率予測・フルスキャン開始"):
-        target_data = ""
+        target_data = url_input if url_input else manual_data
         if url_input:
-            with st.spinner("PC版サイトから全頭データを抽出中..."):
+            with st.spinner("全頭データを抽出中..."):
                 target_data = get_netkeiba_data(url_input)
-        else:
-            target_data = manual_data
 
         if not api_key or not target_data:
             st.error("APIキーとデータが必要です")
         else:
             try:
                 genai.configure(api_key=api_key)
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                # モデル名を最新の gemini-2.0-flash に更新
+                model = genai.GenerativeModel("gemini-2.0-flash")
                 
-                # 勝率予測を義務付けるプロンプト
                 prompt = f"""
                 あなたは競馬AI総監督Baruの右腕だ。18頭フルゲートまで全頭を精密に解析せよ。
                 
                 【最重要：勝率予測ルール】
                 全頭短評の冒頭に、独自アルゴリズムで算出した「単勝勝率％」と「複勝圏内率％」を必ず記載せよ。
                 例：「1. 馬名 [単勝15%/複勝45%] - 短評...」
-                ※全頭の単勝勝率の合計が100%になるよう、期待値を加味して調整すること。
                 
                 【構成】
                 1. 芝の覇者/砂の王 (血統・適性)
                 2. 先行優位ジャッジ (展開予測)
                 3. 下剋上・勝負気配 (上がり最速ポテンシャル馬)
-                4. 全頭解析＆勝率予測 [単%/複%] (1〜18番まで一頭も飛ばさず点呼)
+                4. 全頭解析＆勝率予測 [単%/複%] (1〜18番まで全頭点呼)
                 5. 最終結論 (◎○▲△×)
                 6. 🚀 総監督・勝負馬券 (予算{budget}円)
                    - 【メイン】3連複 1軸4頭流し (◎軸、相手○▲△×) 100円×6点
-                   - 【抑え】残予算で◎の単複や、期待値が高い馬連・ワイドを指示せよ。
+                   - 【抑え】残予算で期待値が高い馬連・ワイドを指示せよ。
                 
                 データ: {target_data}
                 バイアス: {bias}
                 """
-                with st.spinner("18頭の勝率と期待値を計算中..."):
+                with st.spinner("最新エンジンで勝率を計算中..."):
                     response = model.generate_content(prompt)
                     st.session_state["res"] = response.text
             except Exception as e:
@@ -112,7 +109,4 @@ with col2:
     st.subheader("📊 勝率予測・投資指示書")
     if st.session_state["res"]:
         st.markdown(st.session_state["res"])
-    else:
-        st.info("解析を開始すると、ここに勝率(%)付きの診断が表示されます。")
-
-st.caption("Baru Stable AI Pro v12.3 - Win-Probability Model")
+st.caption("Baru Stable AI Pro v12.4 - Engine Optimized")
