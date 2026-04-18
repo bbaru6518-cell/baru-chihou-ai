@@ -22,7 +22,7 @@ def load_cfg():
 
 cfg = load_cfg()
 st.set_page_config(page_title="Baru AI Pro", layout="wide")
-st.title("🏇 Baru 競馬AI Pro - 【買い目抽出ロジック強化版】")
+st.title("🏇 Baru 競馬AI Pro - 【下剋上・買い目自動連動版】")
 
 def get_netkeiba_data(url):
     try:
@@ -54,10 +54,10 @@ with col1:
     url_input = st.text_input("🔗 URLを入力")
     manual_data = st.text_area("✍️ 貼り付け", height=400)
     
-    if st.button("🚀 解析開始（下剋上・勝率重視）"):
+    if st.button("🚀 解析開始（下剋上馬・絶対連動）"):
         target_data = url_input if url_input else manual_data
         if url_input:
-            with st.spinner("データを抽出中..."):
+            with st.spinner("最新データを抽出中..."):
                 target_data = get_netkeiba_data(url_input)
 
         if not api_key or not target_data:
@@ -72,24 +72,24 @@ with col1:
                 prompt = f"""
                 あなたは競馬AI総監督Baruの右腕だ。18頭フルゲートまで全頭を精密に解析せよ。
                 
-                【最重要：買い目の整合性ルール】
-                1. 『下剋上・勝負気配』に選んだ馬は、必ず「最終結論」に印を打ち、「🚀勝負馬券」の買い目に含めること。
-                2. 全頭短評の冒頭に [単勝勝率%/複勝率%] を必ず記載。
+                【最優先：買い目選定の鉄則】
+                1. 「3. 下剋上・勝負気配」で指名した馬は、必ず「5. 最終結論」の印（×以上）に入れ、かつ「6. 🚀1軸流し馬券」の相手に100%含めること。
+                2. 全頭短評の冒頭に [単勝勝率%/複勝率%] を必ず記載せよ。
                 
                 構成：
                 1. 砂の王/芝の覇者 (血統・適性)
                 2. 先行優位ジャッジ (展開予測)
-                3. 下剋上・勝負気配 (上がり実績、展開向く穴馬)
+                3. 下剋上・勝負気配 (上がり最速・展開向く穴馬の徹底マーク)
                 4. 全頭解析＆勝率予測 [単%/複%] (1〜18番全頭点呼)
-                5. 最終結論 (◎○▲△×) ※下剋上の馬は必ず×以上に含める
+                5. 最終結論 (◎○▲△×) ※下剋上の馬は必ず含める
                 6. 🚀 1軸流し馬券(予算{budget}円)
-                   - 【メイン】3連複 1軸流し (◎軸、相手は○▲△×すべて)
-                   - 【抑え】◎-×（下剋上馬）へのワイド等、期待値の高い買い目を必ず一点入れること
+                   - 【メイン】3連複 1軸流し (◎軸、相手は○▲△×全頭)
+                   - 【期待値】◎から下剋上馬（×）へのワイドまたは馬連を「厚め」に指示せよ。
                 
                 データ: {target_data}
                 バイアス: {bias}
                 """
-                with st.spinner(f"エンジン {m_name} で次走リベンジ中..."):
+                with st.spinner(f"エンジン {m_name} で「漏れ」を徹底修正中..."):
                     response = model.generate_content(prompt)
                     st.session_state["res"] = response.text
             except Exception as e:
