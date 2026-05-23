@@ -39,8 +39,8 @@ def get_netkeiba_data(url):
         return f"Error: {e}"
 
 cfg = load_cfg()
-st.set_page_config(page_title="Baru AI Pro v24.6", layout="wide")
-st.title("🏇 Baru 競馬AI Pro - 【Ver 24.6 展開脚質インデックス完全盤】")
+st.set_page_config(page_title="Baru AI Pro v24.7", layout="wide")
+st.title("🏇 Baru 競馬AI Pro - 【Ver 24.7 展開脚質インデックス完全盤】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（JRA・地方ハイブリッド）")
@@ -85,8 +85,8 @@ with col1:
                 
                 model = genai.GenerativeModel(m_name)
                 
-                # --- 一切の改行バグを起こさないインデントなしトリプルクォート ---
-                base_instruction = """あなたは中央競馬（JRA）および地方競馬を統括する競馬AIであり、総監督Baruの絶対的右腕だ。
+                # --- 文字列エラーを絶対に起こさない左端完全密着プロンプト ---
+                base_instruction = """あなたは中央競馬（JRA）および地方競馬を統括する競馬AIであり、総監督Baruの絶対적右腕だ。
 入力されたテキストデータから人気・枠・馬番・馬名・オッズ・過去の通過順を完全に解剖し、逃げ・先行馬の有利不利を見抜いた勝負指示書を作成せよ。
 
 【データ解剖における絶対掟】
@@ -119,4 +119,18 @@ with col1:
 **◎ 軸馬: 〇番 (馬名)**
 1頭目：〇
 2頭目：〇, 〇
-3頭目：〇, 〇, 〇, 〇
+3頭目：〇, 〇, 〇, 〇, 〇, 〇, 〇"""
+                
+                # 末尾で安全に動的データを結合
+                prompt = base_instruction + f"\n対象データ: {target_data}\n総監督バイアス: {bias}\n予算: {budget}円"
+
+                with st.spinner(f"🚀 展開・脚質をマッピング中... ({m_name})"):
+                    response = model.generate_content(prompt)
+                    st.session_state["res"] = response.text
+            except Exception as e:
+                st.error(f"解析エラー: {e}")
+
+with col2:
+    st.subheader("📊 投資指示書 (展開・データ分析枠完全版)")
+    if st.session_state["res"]:
+        st
