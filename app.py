@@ -39,8 +39,8 @@ def get_netkeiba_data(url):
         return f"Error: {e}"
 
 cfg = load_cfg()
-st.set_page_config(page_title="Baru AI Pro v24.3", layout="wide")
-st.title("🏇 Baru 競馬AI Pro - 【Ver 24.3 エラー完全絶滅・展開脚質版】")
+st.set_page_config(page_title="Baru AI Pro v24.4", layout="wide")
+st.title("🏇 Baru 競馬AI Pro - 【Ver 24.4 展開脚質インデックス完全盤】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（JRA・地方ハイブリッド）")
@@ -74,6 +74,13 @@ with col1:
         else:
             try:
                 genai.configure(api_key=api_key)
+                
+                # エラーの原因となっていたモデル選択を極めてシンプルなループに変更
                 models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                m_name = next((x for x in models if "1.5-pro" in x), 
-                             next((x for x
+                m_name = "models/gemini-1.5-pro"  # デフォルト候補
+                for m in models:
+                    if "1.5-pro" in m:
+                        m_name = m
+                        break
+                
+                model = genai.GenerativeModel(m
