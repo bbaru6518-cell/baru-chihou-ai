@@ -39,8 +39,8 @@ def get_netkeiba_data(url):
         return f"Error: {e}"
 
 cfg = load_cfg()
-st.set_page_config(page_title="Baru AI Pro v24.4", layout="wide")
-st.title("🏇 Baru 競馬AI Pro - 【Ver 24.4 展開脚質インデックス完全盤】")
+st.set_page_config(page_title="Baru AI Pro v24.5", layout="wide")
+st.title("🏇 Baru 競馬AI Pro - 【Ver 24.5 展開脚質インデックス完全盤】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（JRA・地方ハイブリッド）")
@@ -75,12 +75,17 @@ with col1:
             try:
                 genai.configure(api_key=api_key)
                 
-                # エラーの原因となっていたモデル選択を極めてシンプルなループに変更
+                # 安全なモデル選択ループ
                 models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                m_name = "models/gemini-1.5-pro"  # デフォルト候補
+                m_name = "models/gemini-1.5-pro"
                 for m in models:
                     if "1.5-pro" in m:
                         m_name = m
                         break
                 
-                model = genai.GenerativeModel(m
+                # 文字欠けを完全修復
+                model = genai.GenerativeModel(m_name)
+                
+                # --- 固定テキストの安全な結合 ---
+                base_instruction = (
+                    "あなたは中央競馬（JRA）および地方競馬を統括する競馬AIであり、総監督Baruの絶対的右腕
