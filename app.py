@@ -39,8 +39,8 @@ def get_netkeiba_data(url):
         return f"Error: {e}"
 
 cfg = load_cfg()
-st.set_page_config(page_title="Baru AI Pro v24.7", layout="wide")
-st.title("🏇 Baru 競馬AI Pro - 【Ver 24.7 展開脚質インデックス完全盤】")
+st.set_page_config(page_title="Baru AI Pro v24.8", layout="wide")
+st.title("🏇 Baru 競馬AI Pro - 【Ver 24.8 モデルエラー完全回避版】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（JRA・地方ハイブリッド）")
@@ -75,18 +75,28 @@ with col1:
             try:
                 genai.configure(api_key=api_key)
                 
-                # 安全なモデル選択ループ
-                models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                m_name = "models/gemini-1.5-pro"
-                for m in models:
-                    if "1.5-pro" in m:
+                # --- [大改修] 利用可能な有効モデルを全自動検知するロジック ---
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                # Pro系（2.5や1.5）を優先的に探すサーチ
+                m_name = None
+                for m in available_models:
+                    if "pro" in m.lower():
                         m_name = m
                         break
                 
+                # もしPro系が見つからなければ、利用可能な最初のモデルをセーフティネットとして自動抜擢
+                if not m_name and available_models:
+                    m_name = available_models[0]
+                
+                # 万が一リスト自体が空だった場合の最終砦
+                if not m_name:
+                    m_name = "models/gemini-1.5-flash"
+                
                 model = genai.GenerativeModel(m_name)
                 
-                # --- 文字列エラーを絶対に起こさない左端完全密着プロンプト ---
-                base_instruction = """あなたは中央競馬（JRA）および地方競馬を統括する競馬AIであり、総監督Baruの絶対적右腕だ。
+                # --- 鉄壁のインデントなしプロンプト ---
+                base_instruction = """あなたは中央競馬（JRA）および地方競馬を統括する競馬AIであり、総監督Baruの絶対的右腕だ。
 入力されたテキストデータから人気・枠・馬番・馬名・オッズ・過去の通過順を完全に解剖し、逃げ・先行馬の有利不利を見抜いた勝負指示書を作成せよ。
 
 【データ解剖における絶対掟】
@@ -121,10 +131,10 @@ with col1:
 2頭目：〇, 〇
 3頭目：〇, 〇, 〇, 〇, 〇, 〇, 〇"""
                 
-                # 末尾で安全に動的データを結合
                 prompt = base_instruction + f"\n対象データ: {target_data}\n総監督バイアス: {bias}\n予算: {budget}円"
 
-                with st.spinner(f"🚀 展開・脚質をマッピング中... ({m_name})"):
+                # 実際に選択されたモデル名をスピナーに表示
+                with st.spinner(f"🚀 展開・脚質をマッピング中... (自動選択: {m_name})"):
                     response = model.generate_content(prompt)
                     st.session_state["res"] = response.text
             except Exception as e:
@@ -133,4 +143,6 @@ with col1:
 with col2:
     st.subheader("📊 投資指示書 (展開・データ分析枠完全版)")
     if st.session_state["res"]:
-        st
+        st.markdown(st.session_state["res"])
+
+st.caption("Baru Stable AI Pro v24.8 - Pace & Position Dynamics Edition")
