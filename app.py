@@ -23,9 +23,24 @@ def load_cfg():
         "b": "JRA（中央競馬）および地方競馬の高速馬場・トラックバイアス、芝・ダートのキレ、走破タイム理論（基準タイム・馬場補正）、上がり3F、展開・ハナ争いを統合解析せよ。"
     }
 
+# --- データ取得ヘルパー関数（エラー防止のため上に配置） ---
+def get_netkeiba_data(url):
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(url, headers=headers)
+        res.encoding = res.apparent_encoding
+        soup = BeautifulSoup(res.text, "html.parser")
+        main_data = soup.find_all("table")
+        combined_text = ""
+        for table in main_data:
+            combined_text += table.get_text(separator="\n", strip=True) + "\n"
+        return combined_text[:50000]
+    except Exception as e:
+        return f"Error: {e}"
+
 cfg = load_cfg()
-st.set_page_config(page_title="Baru AI Pro v24.1", layout="wide")
-st.title("🏇 Baru 競馬AI Pro - 【Ver 24.1 構文修正・展開脚質完全版】")
+st.set_page_config(page_title="Baru AI Pro v24.2", layout="wide")
+st.title("🏇 Baru 競馬AI Pro - 【Ver 24.2 構文エラー根絶・展開脚質完全版】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（JRA・地方ハイブリッド）")
@@ -40,21 +55,6 @@ if "res" not in st.session_state:
     st.session_state["res"] = ""
 
 col1, col2 = st.columns([1, 1])
-
-# --- データを取得するためのヘルパー関数 ---
-def get_netkeiba_data(url):
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers)
-        res.encoding = res.apparent_encoding
-        soup = BeautifulSoup(res.text, "html.parser")
-        main_data = soup.find_all("table")
-        combined_text = ""
-        for table in main_data:
-            combined_text += table.get_text(separator="\n", strip=True) + "\n"
-        return combined_text[:50000]
-    except Exception as e:
-        return f"Error: {e}"
 
 with col1:
     st.subheader("📋 9走馬柱・オッズ混在テキスト入力")
@@ -81,18 +81,19 @@ with col1:
                 
                 model = genai.GenerativeModel(m_name)
                 
-                # --- トリプルクォーテーションのエラーを解消した鉄壁プロンプト ---
-                prompt = f"""あなたは中央競馬（JRA）および地方競馬を統括する競馬AIであり、総監督Baruの絶対的右腕だ。
-入力されたテキストデータから人気・枠・馬番・馬名・オッズ・過去の通過順を完全に解剖し、逃げ・先行馬の有利不利を見抜いた勝負指示書を作成せよ。
-
-【データ解剖における絶対掟】
-1. 過去9走の通過順データ（例: 1-1-1 や 11-10-8 等）や、データ分析テキスト内の「有利な脚質：逃げ」などの文脈から、今回の出走馬の脚質を「逃げ」「先行」「差し」「追込」に超精密に分類せよ。
-2. 特に、ハナを叩きそうな「逃げ」馬、好位をキープする「先行」馬にはマーク（印）をつけ、展開面での有利不利を可視化せよ。
-
-【出力フォーマット】
-以下の3つのセクション構成のみを出力せよ。余計な前置きや挨拶は一切禁止する。
-
-### 📊 全頭精密診断・血統適性リスト
-必ず以下の列を持つMarkdownテーブル形式で今回の出走馬を全頭出力せよ。
-| 馬番 | 馬名 | 父 | 母 | 血統適性 | 脚質 | 人気 | 評価 | 理由 |
-※【脚質】列には
+                # --- バッククォートのエラー干渉を完全にエスケープした鉄壁プロンプト ---
+                prompt = (
+                    f"あなたは中央競馬（JRA）および地方競馬を統括する競馬AIであり、総監督Baruの絶対的右腕だ。\n"
+                    f"入力されたテキストデータから人気・枠・馬番・馬名・オッズ・過去の通過順を完全に解剖し、逃げ・先行馬の有利不利を見抜いた勝負指示書を作成せよ。\n\n"
+                    f"【データ解剖における絶対掟】\n"
+                    f"1. 過去9走の通過順データ（例: 1-1-1 や 11-10-8 等）や、データ分析テキスト内の「有利な脚質：逃げ」などの文脈から、今回の出走馬の脚質を「逃げ」「先行」「差し」「追込」に超精密に分類せよ。\n"
+                    f"2. 特に、ハナを叩きそうな「逃げ」馬、好位をキープする「先行」馬にはマーク（印）をつけ、展開面での有利不利を可視化せよ。\n\n"
+                    f"【出力フォーマット】\n"
+                    f"以下の3つのセクション構成のみを出力せよ。余計な前置きや挨拶は一切禁止する。\n\n"
+                    f"### 📊 全頭精密診断・血統適性リスト\n"
+                    f"必ず以下の列を持つMarkdownテーブル形式で今回の出走馬を全頭出力せよ。\n"
+                    f"| 馬番 | 馬名 | 父 | 母 | 血統適性 | 脚質 | 人気 | 評価 | 理由 |\n"
+                    f"※【脚質】列には、「逃げ🔥」「先行📢」「差し」「追込」のように、逃げ・先行馬がひと目でわかるよう絵文字付きで印をつけよ！\n"
+                    f"※評価は（◎、○、▲、△、注、消）で厳選せよ。\n\n"
+                    f"### 📈 走破タイム・トラックバイアス深層データ分析\n"
+                    f"1. **【
