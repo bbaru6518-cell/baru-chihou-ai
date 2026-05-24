@@ -38,8 +38,14 @@ def get_netkeiba_data(url):
     except Exception as e:
         return f"Error: {e}"
 
+# --- 【最重要】お菓子メニュー（マルチページ）の自動検知許可設定 ---
 cfg = load_cfg()
-st.set_page_config(page_title="Baru AI Pro v24.8", layout="wide")
+st.set_page_config(
+    page_title="Baru AI Pro v24.8", 
+    layout="wide",
+    initial_sidebar_state="expanded"  # アプリ起動時に最初から左側メニューを強制展開する設定
+)
+
 st.title("🏇 Baru 競馬AI Pro - 【Ver 24.8 モデルエラー完全回避版】")
 
 with st.sidebar:
@@ -50,6 +56,10 @@ with st.sidebar:
     if st.button("💾 設定保存"):
         save_cfg(api_key, bias)
         st.success("総監督ルームの設定を保存しました。")
+        
+    # --- サイドバー下部にメニュー誘導の注意書きを追加 ---
+    st.markdown("---")
+    st.caption("💡 WIN5やトリプル馬単は、上のメニュー（🍰や🍬）から一瞬で切り替えられます。")
 
 if "res" not in st.session_state:
     st.session_state["res"] = ""
@@ -75,7 +85,7 @@ with col1:
             try:
                 genai.configure(api_key=api_key)
                 
-                # --- [大改修] 利用可能な有効モデルを全自動検知するロジック ---
+                # 利用可能な有効モデルを全自動検知するロジック
                 available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 
                 # Pro系（2.5や1.5）を優先的に探すサーチ
@@ -95,7 +105,7 @@ with col1:
                 
                 model = genai.GenerativeModel(m_name)
                 
-                # --- 鉄壁のインデントなしプロンプト ---
+                # 鉄壁のインデントなしプロンプト
                 base_instruction = """あなたは中央競馬（JRA）および地方競馬を統括する競馬AIであり、総監督Baruの絶対的右腕だ。
 入力されたテキストデータから人気・枠・馬番・馬名・オッズ・過去の通過順を完全に解剖し、逃げ・先行馬の有利不利を見抜いた勝負指示書を作成せよ。
 
@@ -109,40 +119,4 @@ with col1:
 ### 📊 全頭精密診断・血統適性リスト
 必ず以下の列を持つMarkdownテーブル形式で今回の出走馬を全頭出力せよ。
 | 馬番 | 馬名 | 父 | 母 | 血統適性 | 脚質 | 人気 | 評価 | 理由 |
-※【脚質】列には、「逃げ🔥」「先行📢」「差し」「追込」のように、逃げ・先行馬がひと目でわかるよう絵文字付きで印をつけよ！
-※評価は（◎、○、▲、△、注、消）で厳選せよ。
-
-### 📈 走破タイム・トラックバイアス深層データ分析
-1. 【走破理論・スピード指数分析】: 距離・コース・今回の馬場状態（不・重など）から、走破タイムの基準値・補正値が最も優秀な上位3頭。
-2. 【展開・ハナ争い完全看破】: 今回ハナを叩く可能性が最も高い「逃げ🔥」馬の特定と、その馬が作るペース予想（ハイ/ミドル/スロー）。それによって展開利を受ける「先行📢」馬や差し馬の力関係。
-3. 【激走のシグナル（上積みチェック）】: 過去9走の馬体重の変動、レース間隔の実績、調教評価から、今回「完全叩き一変」の激走気配がある下剋上穴馬。
-4. 【血統×コースマトリクス】: 開催競馬場・コースのリーディングサイアー実績に最も合致する特注配合馬。
-
-### 💰 三連複フォーメーション：厳選15点指示書
-投資効率を最大化する【合計15点】のフォーメーションを強制生成せよ。
- - 1頭目（軸馬）：◎（1頭）
- - 2頭目（対抗）：○や▲から「厳選した2頭」のみを指定
- - 3頭目（紐・穴）：◎、○、▲、△、注を含めた「合計7頭」を指定
-※計算式：1頭×2頭×(7頭 - 2頭) ＝ 【15点】に完全固定。
-
-フォーマット例：
-**◎ 軸馬: 〇番 (馬名)**
-1頭目：〇
-2頭目：〇, 〇
-3頭目：〇, 〇, 〇, 〇, 〇, 〇, 〇"""
-                
-                prompt = base_instruction + f"\n対象データ: {target_data}\n総監督バイアス: {bias}\n予算: {budget}円"
-
-                # 実際に選択されたモデル名をスピナーに表示
-                with st.spinner(f"🚀 展開・脚質をマッピング中... (自動選択: {m_name})"):
-                    response = model.generate_content(prompt)
-                    st.session_state["res"] = response.text
-            except Exception as e:
-                st.error(f"解析エラー: {e}")
-
-with col2:
-    st.subheader("📊 投資指示書 (展開・データ分析枠完全版)")
-    if st.session_state["res"]:
-        st.markdown(st.session_state["res"])
-
-st.caption("Baru Stable AI Pro v24.8 - Pace & Position Dynamics Edition")
+※【脚質】列には、「逃げ🔥」「先行📢」「差し」「追込
