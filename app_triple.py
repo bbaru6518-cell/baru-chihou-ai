@@ -37,9 +37,9 @@ def clean_filename(name):
 
 cfg = load_cfg()
 
-# 👑 【タイトル完全換装】総監督の指示通り「トリプル馬単地方競馬」を大看板とタブへ完全反映！
-st.set_page_config(page_title="Baru トリプル馬単地方競馬AI Pro v24.8.5", layout="wide", initial_sidebar_state="expanded")
-st.title("🏇 Baru トリプル馬単地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
+# 👑 【完全換装】総監督の指示通り、古いタイトル看板を「トリプル馬単地方競馬」へ完全に書き換えました！
+st.set_page_config(page_title="Baru トリプル馬単地方競馬", layout="wide", initial_sidebar_state="expanded")
+st.title("🏇 Baru トリプル馬単地方競馬")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（司令部）[Triple]")
@@ -161,4 +161,47 @@ with col1:
 
 【出力フォーマット】
 ### 📊 全頭精密診断・馬単適性リスト
-必ず以下の列を持つMarkdownテーブル形式で今回の出走馬を全頭出力せよ
+必ず以下の列を持つMarkdownテーブル形式で今回の出走馬を全頭出力せよ。
+| 馬番 | 馬名 | 父 | 母 | 馬単2連対適性 | 脚質 | 人気 | 評価 | 1着2着への決定打 |
+※【脚質】列には、「逃げ🔥」「先行📢」「差し」「追込」の印をつけよ。
+※評価は（◎、○、▲、△、注、消）で厳選せよ。
+
+### 📈 連対圏（1,2着）深層データ分析
+1. 【1着候補・スピード指数分析】: 単勝・馬単1着として突き抜けるタイム・指数を持つ上位3頭（◎○▲級）。
+2. 【2着泥臭い粘り込み・ハナ争い看破】: 1角ポジション争いから、地方小回りで2着に粘り込む「逃げ先行」馬、および展開を利する馬の特定.
+3. 【配当を破壊する激走穴馬】: 人気薄ながら2着以内に突っ込んで配当を跳ね上げるポテンシャルを持つ下剋上穴馬の特定。
+4. 【地方コース×砂質マトリクス】: 当該競馬場の現在の砂質状態（イン有利、外伸び、砂の深さ等）に血統面・馬体重面で最も合致する特注馬。
+
+### 💰 馬単フォーメーション：トリプル制覇の厳選12点指示書
+投資効率とカバー率を最大化する【合計12点】のフォーメーションを強制生成せよ。
+ - 1着（頭固定）：◎および○（合計2頭）
+ - 2着（ヒモ連対）：◎、○、▲、△、注から「厳選した7頭（1着指定馬含む）」を指定
+※計算式 : 2頭 × (7頭 - 1頭) ＝ 【12点】に完全固定。
+
+フォーマット例：
+**🏆 馬単フォーメーション指示（計12点）**
+1着：〇, 〇
+2着：〇, 〇, 〇, 〇, 〇, 〇, 〇"""
+
+                prompt = base_instruction + f"\n対象データ: {target_data}\n総監督バイアス: {bias}\n予算: {budget}円"
+
+                with st.spinner(f"🚀 連対圏（1,2着）をマッピング中... ({m_name})"):
+                    response = model.generate_content(prompt)
+                    output_text = response.text
+                    st.session_state["res"] = output_text
+                    
+                    now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    with open(os.path.join(LOG_DIR, f"トリプル馬単12点_{now_str}.txt"), "w", encoding="utf-8") as log_f:
+                        log_f.write(f"=== 予想生成日時: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n🧠 トリプルバイアス: {bias}\n\n" + output_text)
+                    st.toast("💾 予想ログを保存しました！", icon="💾")
+                    st.rerun()
+        except Exception as e:
+            st.error(f"解析エラー: {e}")
+
+with col2:
+    st.subheader("📊 予想指示書 ＆ 復習ルーム連動表示")
+    if st.session_state["res"]:
+        st.markdown(st.session_state["res"])
+
+# 👑 フッタークレジットも完全に統一
+st.caption("🏇 Baru トリプル馬単地方競馬")
