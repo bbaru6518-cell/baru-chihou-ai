@@ -1,4 +1,3 @@
-地方競馬
 import streamlit as st
 import google.generativeai as genai
 import json
