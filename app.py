@@ -10,9 +10,8 @@ import datetime
 CONFIG_FILE = "baru_pro_config.json"
 LOG_DIR = "racing_logs_standard"
 
-# ログ保存用のフォルダを自動作成
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
+# 🚀 【修正】フォルダがすでにあっても絶対にエラーにしない安全設計
+os.makedirs(LOG_DIR, exist_ok=True)
 
 def save_cfg(k, b):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
@@ -49,7 +48,7 @@ cfg = load_cfg()
 st.set_page_config(
     page_title="Baru AI Pro v24.8", 
     layout="wide",
-    initial_sidebar_state="expanded" # 最初からサイドバーを開く
+    initial_sidebar_state="expanded"
 )
 
 st.title("🏇 Baru 競馬AI Pro - 【Ver 24.8 通常レース・予測ログ完全保存版】")
@@ -63,7 +62,7 @@ with st.sidebar:
         save_cfg(api_key, bias)
         st.success("通常レースの設定を保存しました。")
 
-    # 🚀 【新規機能】過去ログ振り返りルーム
+    # 📂 過去ログ振り返りルーム
     st.markdown("---")
     st.header("📂 過去ログ振り返りルーム")
     log_files = sorted([f for f in os.listdir(LOG_DIR) if f.endswith(".txt")], reverse=True)
@@ -122,7 +121,7 @@ with col1:
 ※評価は（◎、○、▲、△、注、消）で厳選せよ。
 
 ### 📈 走破タイム・トラックバイアス深層データ分析
-1. 【走破理論・スピード指数分析】: 距離・コース・今回の馬場状態（不・重など）から、走破タイムの基準値・補正値が最も優秀な上位3頭.
+1. 【走破理論・スピード指数分析】: 距離・コース・今回の馬場状態（不・重など）から、走破タイムの基準値・補正値が最も優秀な上位3頭。
 2. 【展開・ハナ争い完全看破】: 今回ハナを叩く可能性が最も高い「逃げ🔥」馬の特定と、その馬が作るペース予想（ハイ/ミドル/スロー）。それによって展開利を受ける「先行📢」馬や差し馬の力関係。
 3. 【激走のシグナル（上積みチェック）】: 過去9走の馬体重の変動、レース間隔の実績、調教評価から、今回「完全叩き一変」の激走気配がある下剋上穴馬。
 4. 【血統×コースマトリクス】: 開催競馬場・コースのリーディングサイアー実績に最も合致する特注配合馬。
@@ -147,7 +146,7 @@ with col1:
                     output_text = response.text
                     st.session_state["res"] = output_text
                     
-                    # 🚀 【自動保存処理】
+                    # 🚀 自動ログ保存
                     now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                     log_path = os.path.join(LOG_DIR, f"3連複15点_{now_str}.txt")
                     with open(log_path, "w", encoding="utf-8") as log_f:
