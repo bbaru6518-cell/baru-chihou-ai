@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import datetime
 import re
 
-# --- ⭕ トリプル馬単専用・設定保存機能（競合完全回避） ---
+# --- 設定保存機能 ---
 CONFIG_FILE = "baru_triple_config.json"
 LOG_DIR = "racing_logs_triple"  # トリプル馬単専用の独立フォルダ
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -25,8 +25,8 @@ def load_cfg():
             pass
     return {
         "k": "", 
-        # ⭕ 【初期値換装】トリプル馬単（後半3Rの馬単）を射抜くための専用初期バイアス
-        "b": "トリプル馬単対象地方レース（主に後半3R）のトラックバイアス、砂質、1角ポジション争い、絶対に崩れない軸馬の選定、および逆転候補の展開利・ハナ争いを統合解析せよ。"
+        # 【トリプル馬単特化】馬単を3連続で射抜くための、地方の展開・ハナ争い・完全前残りバイアスに特化した初期指示
+        "b": "トリプル馬単対象地方レース（主に後半3R）のトラックバイアス, 砂質, 1角ポジション争い, 絶対に崩れない軸馬の選定, および逆転候補の展開利・ハナ争いを統合解析せよ。"
     }
 
 def clean_filename(name):
@@ -37,22 +37,22 @@ def clean_filename(name):
 
 cfg = load_cfg()
 
-# 👑 【看板完全死守】大看板およびブラウザタブの表記は総監督オリジナルの看板を完全に維持
-st.set_page_config(page_title="Baru 地方競馬AI Pro v24.8.5", layout="wide", initial_sidebar_state="expanded")
-st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
+# 👑 【完全修正】総監督のご指示通り、大看板タイトルから古い「高速・軽量化安定版」を徹底排除し、完全リニューアル！
+st.set_page_config(page_title="Baru トリプル馬単地方競馬AI Pro v24.8.5", layout="wide", initial_sidebar_state="expanded")
+st.title("🏇 Baru トリプル馬単地方競馬AI Pro - 【Ver 24.8.5 高速・トリプル特化版】")
 
 with st.sidebar:
-    st.header("⚙️ 総監督ルーム（司令部）")
+    st.header("⚙️ 総監督ルーム（司令部）[Triple]")
     api_key = st.text_input("Gemini API KEY", value=cfg.get("k", ""), type="password")
-    bias = st.text_area("🧠 総監督バイアス（補正値）", value=cfg.get("b"), height=150)
+    bias = st.text_area("🧠 総監督バイアス（トリプル馬単補正値）", value=cfg.get("b"), height=150)
     budget = st.number_input("1レース予算(円)", value=1500, step=100)
     if st.button("💾 設定保存"):
         save_cfg(api_key, bias)
-        st.success("設定を保存しました。")
+        st.success("トリプル馬単専用設定を保存しました。")
 
-    # 📂 過去ログ呼び出し ＆ 復習ルーム（トリプル馬単専用フォルダ連動）
+    # 📂 過去ログ呼び出し ＆ 復習ルーム
     st.markdown("---")
-    st.header("📂 過去ログ復習")
+    st.header("📂 過去ログ復習 [Triple]")
     log_files = sorted([f for f in os.listdir(LOG_DIR) if f.endswith(".txt")], reverse=True)
     
     if log_files:
@@ -85,7 +85,6 @@ with st.sidebar:
                     with open(os.path.join(LOG_DIR, selected_log), "r", encoding="utf-8") as f:
                         past_prediction = f.read()
                         
-                    # ⭕ 馬単の1着2着のズレを徹底追及する復習用ロジック
                     p_1 = "あなたは総監督Baruの右腕競馬AIだ。提示されたトリプル馬単対象レースの予想指示書と、実際のレース結果コピペを徹底的に突き合わせ、短く簡潔に箇条書きで猛省レポートを作成せよ。\n\n"
                     p_2 = f"【タイトル】最上部に見出し「### 🏁 {raw_title} 戦果照合」を出力せよ。\n\n"
                     p_3 = "【馬単解析掟】\n1. 1着・2着の入線パターンとコーナー通過順から、想定外の逃げ残りや差し遅れのズレを炙り出せ。\n2. 馬単高配当を演出した人気薄の激走理由（地方砂質・トラックバイアス）の読みのズレを猛省せよ。\n3. 次回トリプル馬単を仕留めるため、バイアス設定をどう微調整すべきか簡潔に導け。\n\n"
@@ -151,7 +150,7 @@ with col1:
                 m_name = next((m for m in available_models if "pro" in m.lower()), available_models[0] if available_models else "models/gemini-1.5-flash")
                 model = genai.GenerativeModel(m_name)
                 
-                # ⭕ 【トリプル馬単完全特化型プロンプト】看板は維持しつつ、中身は完全に「馬単1着2着」を仕留めるためのロジックを強制注入
+                # 【トリプル馬単特化型プロンプト】馬単の1着2着を執念で当てるためのロジック
                 base_instruction = """あなたはトリプル馬単を完全ハックするプロ競馬AIであり、総監督Baruの絶対的右腕だ。
 入力されたデータから人気・枠番・馬番・馬名・オッズ・通過順を完全に解剖し、地方ダート戦で馬単の「1着・2着」を絶対に逃さない鋭い勝負指示書を最速で作成せよ。
 
@@ -204,5 +203,5 @@ with col2:
     if st.session_state["res"]:
         st.markdown(st.session_state["res"])
 
-# 👑 【看板完全死守】フッター表記も変更せず完全に固定
-st.caption("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
+# 👑 クレジットも完全にトリプル馬単仕様へ刷新
+st.caption("🏇 Baru トリプル馬単地方競馬AI Pro - 【Ver 24.8.5 高速・トリプル特化版】")
