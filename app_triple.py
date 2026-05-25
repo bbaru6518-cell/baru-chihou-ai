@@ -26,7 +26,7 @@ def load_cfg():
     return {
         "k": "", 
         # 【トリプル馬単地方競馬特化】馬単を3連続で射抜くための、地方の展開・ハナ争い・完全前残り・または紛れる重馬場バイアスに特化した初期指示
-        "b": "トリプル馬単対象地方レース（主に後半3R）のトラックバイアス、砂質、1角ポジション争い、絶対に崩れない軸馬の選定、および逆転候補の展開利・ハナ争いを統合解析せよ。"
+        "b": "トリプル馬単対象地方レース（主に後半3R）のトラックバイアス, 砂質, 1角ポジション争い, 絶対に崩れない軸馬の選定, および逆転候補の展開利・ハナ争いを統合解析せよ。"
     }
 
 def clean_filename(name):
@@ -37,7 +37,7 @@ def clean_filename(name):
 
 cfg = load_cfg()
 
-# ⭕ 【完全修正】ブラウザタブのタイトルと、画面内の大看板タイトルを「トリプル馬単地方競馬」に完全刷新！
+# 👑 【完全修正】ブラウザタブおよび大看板タイトルから古い表記を徹底排除し、完全リニューアル！
 st.set_page_config(page_title="Baru AI Triple Local Pro v24.8.5", layout="wide", initial_sidebar_state="expanded")
 st.title("🏇 Baru トリプル馬単地方競馬AI Pro - 【Ver 24.8.5 高速・トリプル特化版】")
 
@@ -68,25 +68,4 @@ with st.sidebar:
         st.caption("💡 1行目にレース名を入力し、2行目から結果（着順・払戻金・通過順）を丸ごとコピペしてください。")
         result_copypaste = st.text_area("1行目：レース名 / 2行目〜：結果コピペ", height=200)
         
-        if st.button("🚨 馬単の着順・ハナ争いと照合して復習"):
-            if not api_key or not result_copypaste.strip():
-                st.error("APIキーと結果データが必要です")
-            else:
-                try:
-                    genai.configure(api_key=api_key)
-                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    m_name = next((m for m in available_models if "pro" in m.lower()), available_models[0] if available_models else "models/gemini-1.5-flash")
-                    model = genai.GenerativeModel(m_name)
-                    
-                    lines = result_copypaste.splitlines()
-                    raw_title = lines[0].strip() if lines else "トリプル対象レース結果"
-                    cleaned_title = clean_filename(raw_title)
-                    
-                    with open(os.path.join(LOG_DIR, selected_log), "r", encoding="utf-8") as f:
-                        past_prediction = f.read()
-                        
-                    # 【バグ根絶】安全なパーツ結合方式
-                    p_1 = "あなたは総監督Baruの右腕競馬AIだ。提示されたトリプル馬単地方競馬対象レースの予想指示書と、実際のレース結果コピペを徹底的に突き合わせ、短く簡潔に箇条書きで猛省レポートを作成せよ。\n\n"
-                    p_2 = f"【タイトル】最上部に見出し「### 🏁 {raw_title} トリプル馬単地方競馬・戦果照合」を出力せよ。\n\n"
-                    p_3 = "【馬単解析掟】\n1. 1着・2着の入線パターンとコーナー通過順から、想定外の逃げ残りや差し遅れのズレを炙り出せ。\n2. 馬単高配当を演出した人気薄の激走理由（地方砂質・トラックバイアス）の読みのズレを猛省せよ。\n3. 次回トリプル馬単地方競馬を仕留めるため、バイアス設定をどう微調整すべきか簡潔に導け。\n\n"
-                    p_4 = f"【出力フォーマット】\n### 🏁 {raw_title} トリプル馬単地方競馬・戦果照合\n馬単払戻金および戦果の整理\n\n### 🧠 1着
+        if st.button("🚨 馬単の着順
