@@ -5,6 +5,7 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import datetime
+import re
 
 # --- 設定保存機能 ---
 CONFIG_FILE = "baru_pro_config.json"
@@ -27,9 +28,16 @@ def load_cfg():
         "b": "JRA（中央競馬）および地方競馬の高速馬場・トラックバイアス、芝・ダートのキレ、走破タイム理論（基準タイム・馬場補正）、上がり3F、展開・ハナ争いを統合解析せよ。"
     }
 
+# ファイル名に使えない禁止文字を安全にクリーニングする関数
+def clean_filename(name):
+    if not name:
+        return ""
+    clean = re.sub(r'[\\/*?:"<>| \t]', '_', name.strip())
+    return clean[:50]
+
 cfg = load_cfg()
 st.set_page_config(page_title="Baru AI Pro v24.8", layout="wide", initial_sidebar_state="expanded")
-st.title("🏇 Baru 競馬AI Pro - 【Ver 24.8 自己学習型・復習ルーム搭載版】")
+st.title("🏇 Baru 競馬AI Pro - 【Ver 24.8 ファイル名連動・自己学習型】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（通常レース指令部）")
@@ -55,10 +63,11 @@ with st.sidebar:
             
         st.markdown("---")
         st.subheader("🏁 レース結果のコピペ投入")
-        result_copypaste = st.text_area("払い戻し・着順・通過順のページを丸ごとコピペ", height=200, help="netkeiba等の結果画面をそのまま全選択コピーして貼り付けてOKです。")
+        st.caption("💡 1行目にレース名やタイトル（例：大井11R 帝王賞）を入力し、2行目から結果を丸ごとコピペしてください！ファイル名がそのレース名に生まれ変わります。")
+        result_copypaste = st.text_area("1行目：レース名 / 2行目〜：結果コピペ", height=200)
         
         if st.button("🚨 実際の着順・ハナ争いと照合して復習"):
-            if not api_key or not result_copypaste:
+            if not api_key or not result_copypaste.strip():
                 st.error("APIキーと結果データが必要です")
             else:
                 try:
@@ -67,20 +76,26 @@ with st.sidebar:
                     m_name = next((m for m in available_models if "pro" in m.lower()), available_models[0] if available_models else "models/gemini-1.5-flash")
                     model = genai.GenerativeModel(m_name)
                     
-                    # 当時の予想テキストを読み込む
+                    lines = result_copypaste.splitlines()
+                    raw_title = lines[0].strip() if lines else "通常レース結果"
+                    cleaned_title = clean_filename(raw_title)
+                    
                     with open(os.path.join(LOG_DIR, selected_log), "r", encoding="utf-8") as f:
                         past_prediction = f.read()
                         
-                    review_prompt = f"""あなたは総監督Baruの右腕AIだ。提示された【当時の予想指示書】と、実際の【レース結果コピペ（着順・通過順・配当）】を徹底的に突き合わせ、以下の構成で『超精密な反省・復習レポート』を作成せよ。
+                    review_prompt = f"""あなたは総監督Baruの右腕AIだ。提示された【当時の予想指示書】と、実際の【レース結果コピペ】を徹底的に突き合わせ、超精密な反省・復習レポートを作成せよ。
+
+【超重要：タイトル認識の掟】
+最上部には、必ず総監督が指定したタイトル「{raw_title}」を引用して「### 🏁 {raw_title} 答え合わせ・戦果照合」という見出しからスタートせよ。
 
 【解析の絶対掟】
-1. 通過順データから「想定外の逃げ・先行馬の暴走」や「予測したハナ争いのズレ」を完全に炙り出せ。
-2. タイム補正やトラックバイアス（イン有利・外伸び等）が結果にどう影響したか、AI側の読みのズレを猛省せよ。
+1. 通過順データから「想定外の逃げ・先行馬の動き」や「予測したハナ争いのズレ」を完全に炙り出せ。
+2. タイム補正やトラックバイアスが結果にどう影響したか、AI側の読みのズレを猛省せよ。
 3. 次回全く同じコース・条件下で勝負する際、バイアスやスピード指数をどう微調整すべきか、具体的な改善策を導き出せ。
 
 【出力フォーマット】
-### 🏁 レース答え合わせ・配当照合
-（的中か不的中か、および実際の配当結果の整理）
+### 🏁 {raw_title} 答え合わせ・戦果照合
+（的中か不的中か、実際の配当結果の整理）
 
 ### 🧠 展開・ハナ争いのズレ解剖（猛省）
 （コーナー通過順や実際の逃げ馬の動きから、展開予測がどう狂ったかを分析）
@@ -97,14 +112,25 @@ with st.sidebar:
 
                     with st.spinner("実際の着順・コーナー通過順から猛省・復習中..."):
                         response = model.generate_content(review_prompt)
-                        review_result = "\n\n" + "="*20 + " 🏁 実際のレース結果に基づく復習ログ " + "="*20 + "\n" + response.text
+                        review_result = "\n\n" + "="*20 + f" 🏁 {raw_title} 復習ログ " + "="*20 + "\n" + response.text
                         
-                        # ログファイルに反省文を追記
-                        with open(os.path.join(LOG_DIR, selected_log), "a", encoding="utf-8") as f:
-                            f.write(review_result)
+                        # 🚀 【大改造】古い日付だけのファイルから、レース名入りの新ファイル名へリネーム＆追記
+                        old_path = os.path.join(LOG_DIR, selected_log)
+                        now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                        new_filename = f"{cleaned_title}_{now_str}.txt"
+                        new_path = os.path.join(LOG_DIR, new_filename)
+                        
+                        # 新しい内容を作成して新ファイル名で保存、古いものは削除
+                        full_content = past_prediction + review_result
+                        with open(new_path, "w", encoding="utf-8") as nf:
+                            nf.write(full_content)
+                        
+                        if old_path != new_path and os.path.exists(old_path):
+                            os.remove(old_path)
                             
-                        st.session_state["res"] = past_prediction + review_result
-                        st.success("💾 復習ログをファイルに追記保存しました！")
+                        st.session_state["res"] = full_content
+                        st.success(f"💾 ファイル名を「{new_filename}」に変更し、復習ログを完全保存しました！")
+                        st.rerun()
                 except Exception as e:
                     st.error(f"復習解析エラー: {e}")
     else:
@@ -120,47 +146,8 @@ with col1:
     manual_data = st.text_area("✍️ netkeibaコピペデータ", height=500)
     
     if st.button("🚀 構造解剖・多角データ解析開始"):
-        # （省略なしの通常レーススクレイピング＆生成ロジックをそのまま維持）
         try:
             if url_input:
                 with st.spinner("レースデータをスクレイピング中..."):
                     headers = {"User-Agent": "Mozilla/5.0"}
-                    res = requests.get(url_input, headers=headers)
-                    res.encoding = res.apparent_encoding
-                    soup = BeautifulSoup(res.text, "html.parser")
-                    main_data = soup.find_all("table")
-                    target_data = ""
-                    for table in main_data:
-                        target_data += table.get_text(separator="\n", strip=True) + "\n"
-                    target_data = target_data[:50000]
-            else:
-                target_data = manual_data
-
-            if not api_key or not target_data:
-                st.error("必要なデータが不足しています")
-            else:
-                genai.configure(api_key=api_key)
-                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                m_name = next((m for m in available_models if "pro" in m.lower()), available_models[0] if available_models else "models/gemini-1.5-flash")
-                model = genai.GenerativeModel(m_name)
-                
-                base_instruction = """（前述の三連複15点用プロンプトをそのまま完全実行）"""
-                prompt = base_instruction + f"\n対象データ: {target_data}\n総監督バイアス: {bias}\n予算: {budget}円"
-
-                with st.spinner(f"🚀 展開・脚質をマッピング中... ({m_name})"):
-                    response = model.generate_content(prompt)
-                    output_text = response.text
-                    st.session_state["res"] = output_text
-                    
-                    now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    with open(os.path.join(LOG_DIR, f"3連複15点_{now_str}.txt"), "w", encoding="utf-8") as log_f:
-                        log_f.write(f"=== 予想生成日時: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n🧠 バイアス: {bias}\n\n" + output_text)
-                    st.toast("💾 予想ログを自動保存しました！", icon="💾")
-        except Exception as e:
-            st.error(f"解析エラー: {e}")
-
-with col2:
-    st.subheader("📊 投資指示書 ＆ 復習ルーム連動表示")
-    if st.session_state["res"]:
-        st.markdown(st.session_state["res"])
-st.caption("Baru Stable AI Pro v24.8 - Self-Learning Edition")
+                    res = requests.get(url
