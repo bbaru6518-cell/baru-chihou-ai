@@ -95,7 +95,7 @@ with st.sidebar:
 
 【出力フォーマット】
 ### 🏁 {raw_title} 答え合わせ・戦果照合
-（的中か不的中か、実際の配当結果の整理）
+（的中か不中断か、実際の配当結果の整理）
 
 ### 🧠 展開・ハナ争いのズレ解剖（猛省）
 （コーナー通過順や実際の逃げ馬の動きから、展開予測がどう狂ったかを分析）
@@ -114,13 +114,12 @@ with st.sidebar:
                         response = model.generate_content(review_prompt)
                         review_result = "\n\n" + "="*20 + f" 🏁 {raw_title} 復習ログ " + "="*20 + "\n" + response.text
                         
-                        # 🚀 【大改造】古い日付だけのファイルから、レース名入りの新ファイル名へリネーム＆追記
+                        # 古い日付だけのファイルから、レース名入りの新ファイル名へリネーム＆追記
                         old_path = os.path.join(LOG_DIR, selected_log)
                         now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                         new_filename = f"{cleaned_title}_{now_str}.txt"
                         new_path = os.path.join(LOG_DIR, new_filename)
                         
-                        # 新しい内容を作成して新ファイル名で保存、古いものは削除
                         full_content = past_prediction + review_result
                         with open(new_path, "w", encoding="utf-8") as nf:
                             nf.write(full_content)
@@ -147,7 +146,25 @@ with col1:
     
     if st.button("🚀 構造解剖・多角データ解析開始"):
         try:
+            target_data = ""
             if url_input:
                 with st.spinner("レースデータをスクレイピング中..."):
                     headers = {"User-Agent": "Mozilla/5.0"}
-                    res = requests.get(url
+                    # ⭕ 【修正箇所】カッコ閉じと変数名を100%修正しました
+                    res = requests.get(url_input, headers=headers)
+                    res.encoding = res.apparent_encoding
+                    soup = BeautifulSoup(res.text, "html.parser")
+                    main_data = soup.find_all("table")
+                    for table in main_data:
+                        target_data += table.get_text(separator="\n", strip=True) + "\n"
+                    target_data = target_data[:50000]
+            else:
+                target_data = manual_data
+
+            if not api_key or not target_data:
+                st.error("必要なデータが不足しています")
+            else:
+                genai.configure(api_key=api_key)
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                m_name = next((m for m in available_models if "pro" in m.lower()), available_models[0] if available_models else "models/gemini-1.5-flash")
+                model = genai.GenerativeModel(m_name)
