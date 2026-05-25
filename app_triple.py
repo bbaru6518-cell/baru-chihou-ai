@@ -37,9 +37,9 @@ def clean_filename(name):
 
 cfg = load_cfg()
 
-# 👑 【完全修正】総監督のご指示通り、大看板タイトルから古い「高速・軽量化安定版」を徹底排除し、完全リニューアル！
-st.set_page_config(page_title="Baru トリプル馬単地方競馬AI Pro v24.8.5", layout="wide", initial_sidebar_state="expanded")
-st.title("🏇 Baru トリプル馬単地方競馬AI Pro - 【Ver 24.8.5 高速・トリプル特化版】")
+# 👑 【完全一致】総監督指定の美しい大看板タイトルを1文字の狂いもなく完全固定
+st.set_page_config(page_title="Baru 地方競馬AI Pro v24.8.5", layout="wide", initial_sidebar_state="expanded")
+st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（司令部）[Triple]")
@@ -91,7 +91,7 @@ with st.sidebar:
                     p_4 = f"【出力フォーマット】\n### 🏁 {raw_title} 戦果照合\n馬単払戻金および戦果の整理\n\n### 🧠 1着2着・ハナ争いのズレ解剖\n馬単の着順に直結した地方小回り展開・バイアスのズレ分析\n\n### 🛠️ 次回制覇へのAIロジック微調整案\n地方ダート補正や馬場バイアスの具体的アドバイス\n\n"
                     p_5 = f"---\n【当時の予想指示書】:\n{past_prediction}\n\n【実際のレース結果コピペ】:\n{result_copypaste}"
                     
-                    review_prompt = p_1 + p_2 + p_3 + p_4 + p_5
+                    review_prompt = p_1 + p_2 + p_3 + f"【出力フォーマット】\n### 🏁 {raw_title} 戦果照合\n馬単払戻金および戦果の整理\n\n### 🧠 1着2着・ハナ争いのズレ解剖\n馬単の着順に直結した地方小回り展開・バイアスのズレ分析\n\n### 🛠️ 次回制覇へのAIロジック微調整案\n地方ダート補正や馬場バイアスの具体的アドバイス\n\n" + p_5
 
                     with st.spinner("1・2着展開のズレから猛省・復習中..."):
                         response = model.generate_content(review_prompt)
@@ -203,5 +203,5 @@ with col2:
     if st.session_state["res"]:
         st.markdown(st.session_state["res"])
 
-# 👑 クレジットも完全にトリプル馬単仕様へ刷新
-st.caption("🏇 Baru トリプル馬単地方競馬AI Pro - 【Ver 24.8.5 高速・トリプル特化版】")
+# 👑 【完全一致】フッターのクレジットも総監督指定の美しい看板デザインに完全統一
+st.caption("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
