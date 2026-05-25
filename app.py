@@ -1,3 +1,4 @@
+地方競馬
 import streamlit as st
 import google.generativeai as genai
 import json
@@ -83,4 +84,12 @@ with st.sidebar:
                     with open(os.path.join(LOG_DIR, selected_log), "r", encoding="utf-8") as f:
                         past_prediction = f.read()
                         
-                    review_prompt = f"""あなたは総監督Baruの右腕AIだ。提示された【当時の予想指示書】と、実際の【レース結果コピペ】を徹底的に突き合わせ、超精密な反省・復
+                    # ⭕ 【大修正】Pythonのf-string誤検知を防ぐため、波カッコを2重（{{ }}）にして完全にエスケープしました
+                    review_prompt = f"""あなたは総監督Baruの右腕AIだ。提示された【当時の予想指示書】と、実際の【レース結果コピペ】を徹底的に突き合わせ、超精密な反省・復習レポートを作成せよ。
+
+【超重要：タイトル認識の掟】
+最上部には、必ず総監督が指定したタイトル「{raw_title}」を引用して「### 🏁 {raw_title} 答え合わせ・戦果照合」という見出しからスタートせよ。
+
+【解析の絶対掟】
+1. 通過順データから「想定外の逃げ・先行馬の動き」や「予測したハナ争いのズレ」を完全に炙り出せ。
+2.
