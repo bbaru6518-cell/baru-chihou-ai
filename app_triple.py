@@ -37,9 +37,9 @@ def clean_filename(name):
 
 cfg = load_cfg()
 
-# 👑 【完全換装】総監督のご指示通り、大看板タイトルおよびタブ名を「トリプル馬単地方競馬AI Pro」仕様へ完全リニューアル！
-st.set_page_config(page_title="Baru トリプル馬単地方競馬AI Pro v24.8.5", layout="wide", initial_sidebar_state="expanded")
-st.title("🏇 Baru トリプル馬単地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
+# 👑 【完全換装】総監督の指示通り、大看板・タブ名・クレジットを「トリプル馬単専用機」へ完全刷新！
+st.set_page_config(page_title="Baru トリプル馬単専用機 v24.8.5", layout="wide", initial_sidebar_state="expanded")
+st.title("🏇 Baru トリプル馬単専用機 - 【Ver 24.8.5 高速・軽量化安定版】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（司令部）[Triple]")
@@ -203,5 +203,5 @@ with col2:
     if st.session_state["res"]:
         st.markdown(st.session_state["res"])
 
-# 👑 【完全換装】フッターのクレジットも総監督指定通りトリプル馬単仕様へ！
-st.caption("🏇 Baru トリプル馬単地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
+# 👑 【完全一致】クレジットも「トリプル馬単専用機」へ完全刷新
+st.caption("🏇 Baru トリプル馬単専用機 - 【Ver 24.8.5 高速・軽量化安定版】")
