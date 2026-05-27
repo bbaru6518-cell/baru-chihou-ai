@@ -25,7 +25,7 @@ def load_cfg():
             pass
     return {
         "k": "", 
-        "b": "地方競馬（南関東・門別・高知・園田等）の砂質・砂の深さ、トラックバイアス（イン有利・外伸び）、逃げ先行圧倒的有利な小回りコース特性、走破タイム理論（基準タイム・馬場補正）、イン差し・連対率を統合解析せよ。"
+        "b": "JRA（中央競馬）および地方競馬の高速馬場・トラックバイアス、芝・ダートのキレ、走破タイム理論（基準タイム・馬場補正）、上がり3F、展開・ハナ争いを統合解析せよ。"
     }
 
 def clean_filename(name):
@@ -35,8 +35,8 @@ def clean_filename(name):
     return clean[:50]
 
 cfg = load_cfg()
-st.set_page_config(page_title="Baru AI Local Pro v24.8.8", layout="wide", initial_sidebar_state="expanded")
-st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.8 フォーメーションレイアウト修正版】")
+st.set_page_config(page_title="Baru AI Local Pro v24.8.9", layout="wide", initial_sidebar_state="expanded")
+st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.9 紐＆レイアウト完全修正版】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（地方レース指令部）")
@@ -170,14 +170,17 @@ with col1:
 ### 💰 三連複フォーメーション：厳選15点指示書
 投資効率を最大化する【合計15点】のフォーメーションを強制生成せよ。
 
+【買い目構築に関する絶対鉄則】
+地方競馬は小回りかつ先行・逃げ馬が粘り込む確率が極めて高い。そのため、テーブル内で【逃げ🔥】または【先行📢】と判定した馬は、いかなる場合も必ず「3頭目（紐馬）」の対象馬番に最低1頭以上は強制的に組み込むロジックを展開せよ。
+
 【表示に関する超重要指令】
-改行が半角スペースとして処理され1行に固まるのを防ぐため、各頭目の指定には、必ず行頭に「* 」（半角アスタリスクと半角スペース）を付与した箇条書きマークダウン構文を使用せよ。コードブロック（```）等で囲むのは一切禁止とする。必ず以下のフォーマットを完全厳守せよ。
+Streamlitの仕様で改行が半角スペースに潰れるバグを回避するため、フォーメーション各行の末尾に、必ずHTMLの改行タグである「<br>」を直接付与して出力せよ。コードブロック（```）等で囲むのは一切禁止とする。
 
 (フォーマット例)
-◎ 軸馬: 〇番 (馬名)
-* 1頭目: 〇番
-* 2頭目: 〇番, 〇番, 〇番
-* 3頭目: 〇番, 〇番, 〇番, 〇番, 〇番, 〇番, 〇番"""
+◎ 軸馬: 〇番 (馬名)<br>
+1頭目: 〇番<br>
+2頭目: 〇番, 〇番, 〇番<br>
+3頭目: 〇番, 〇番, 〇番, 〇番, 〇番, 〇番, 〇番<br>"""
 
                 prompt = base_instruction + f"\n対象データ: {target_data}\n総監督バイアス: {bias}\n予算: {budget}円"
 
@@ -197,5 +200,5 @@ with col1:
 with col2:
     st.subheader("📊 投資指示書 ＆ 復習ルーム連動表示")
     if st.session_state["res"]:
-        st.markdown(st.session_state["res"])
-st.caption("Baru Stable AI Local Pro v24.8.8 - Fast & Format Optimized Edition")
+        st.markdown(st.session_state["res"], unsafe_allow_html=True)
+st.caption("Baru Stable AI Local Pro v24.8.9 - HTML LineBreak & FrontRunner-Optimized Edition")
