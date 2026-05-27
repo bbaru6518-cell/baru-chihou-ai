@@ -35,8 +35,8 @@ def clean_filename(name):
     return clean[:50]
 
 cfg = load_cfg()
-st.set_page_config(page_title="Baru AI Local Pro v24.8.6", layout="wide", initial_sidebar_state="expanded")
-st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.6 高速・フォーメーション最適化版】")
+st.set_page_config(page_title="Baru AI Local Pro v24.8.7", layout="wide", initial_sidebar_state="expanded")
+st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.7 高速・フォーメーション完全修正版】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（地方レース指令部）")
@@ -164,18 +164,20 @@ with col1:
 ### 📈 地方走破タイム・砂質トラックバイアス深層データ分析
 1. 【地方走破理論・スピード指数分析】: 馬場状態からタイム・指数が優秀な上位3頭を箇条書きで。
 2. 【地方小回り・ハナ争い完全看破】: 1角までにハナを叩く「逃げ🔥」馬の特定と展開予測。
-3. 【移籍・外抜け・叩き一変シグナル】: 激走気配がある下剋上穴馬の特定。
+3. 【移籍・外厩・叩き一変シグナル】: 激走気配がある下剋上穴馬の特定。
 4. 【地方コース×血統マトリクス】: コースの砂質に最も合致する特注配合馬。
 
 ### 💰 三連複フォーメーション：厳選15点指示書
 投資効率を最大化する【合計15点】のフォーメーションを強制生成せよ。
 
-以下の出力例の形式を厳格に守り、各頭目の馬番を美しく一行ずつ表示せよ。
+【表示に関する超重要指令】
+各頭目の対象馬番は、必ず以下のフォーマット例の通り「改行せず、一行のカンマ区切り」で綺麗に並べて出力せよ。コードブロック（```）等で囲むのも一切禁止とする。
+
 (フォーマット例)
 **◎ 軸馬: 〇番 (馬名)**
-1頭目：〇番
-2頭目：〇番, 〇番
-3頭目：〇番, 〇番, 〇番, 〇番, 〇番, 〇番, 〇番"""
+1番 〇番
+2番 〇番, 〇番
+3番 〇番, 〇番, 〇番, 〇番, 〇番, 〇番, 〇番"""
 
                 prompt = base_instruction + f"\n対象データ: {target_data}\n総監督バイアス: {bias}\n予算: {budget}円"
 
@@ -196,4 +198,4 @@ with col2:
     st.subheader("📊 投資指示書 ＆ 復習ルーム連動表示")
     if st.session_state["res"]:
         st.markdown(st.session_state["res"])
-st.caption("Baru Stable AI Local Pro v24.8.6 - Fast & Format Optimized Edition")
+st.caption("Baru Stable AI Local Pro v24.8.7 - Fast & Format Optimized Edition")
