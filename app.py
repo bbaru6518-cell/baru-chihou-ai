@@ -35,8 +35,8 @@ def clean_filename(name):
     return clean[:50]
 
 cfg = load_cfg()
-st.set_page_config(page_title="Baru AI Local Pro v24.8.7", layout="wide", initial_sidebar_state="expanded")
-st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.7 高速・フォーメーション完全修正版】")
+st.set_page_config(page_title="Baru AI Local Pro v24.8.8", layout="wide", initial_sidebar_state="expanded")
+st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.8 フォーメーションレイアウト修正版】")
 
 with st.sidebar:
     st.header("⚙️ 総監督ルーム（地方レース指令部）")
@@ -171,13 +171,13 @@ with col1:
 投資効率を最大化する【合計15点】のフォーメーションを強制生成せよ。
 
 【表示に関する超重要指令】
-各頭目の対象馬番は、必ず以下のフォーマット例の通り「改行せず、一行のカンマ区切り」で綺麗に並べて出力せよ。コードブロック（```）等で囲むのも一切禁止とする。
+改行が半角スペースとして処理され1行に固まるのを防ぐため、各頭目の指定には、必ず行頭に「* 」（半角アスタリスクと半角スペース）を付与した箇条書きマークダウン構文を使用せよ。コードブロック（```）等で囲むのは一切禁止とする。必ず以下のフォーマットを完全厳守せよ。
 
 (フォーマット例)
-**◎ 軸馬: 〇番 (馬名)**
-1番 〇番
-2番 〇番, 〇番
-3番 〇番, 〇番, 〇番, 〇番, 〇番, 〇番, 〇番"""
+◎ 軸馬: 〇番 (馬名)
+* 1頭目: 〇番
+* 2頭目: 〇番, 〇番, 〇番
+* 3頭目: 〇番, 〇番, 〇番, 〇番, 〇番, 〇番, 〇番"""
 
                 prompt = base_instruction + f"\n対象データ: {target_data}\n総監督バイアス: {bias}\n予算: {budget}円"
 
@@ -198,4 +198,4 @@ with col2:
     st.subheader("📊 投資指示書 ＆ 復習ルーム連動表示")
     if st.session_state["res"]:
         st.markdown(st.session_state["res"])
-st.caption("Baru Stable AI Local Pro v24.8.7 - Fast & Format Optimized Edition")
+st.caption("Baru Stable AI Local Pro v24.8.8 - Fast & Format Optimized Edition")
