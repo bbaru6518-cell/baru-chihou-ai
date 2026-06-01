@@ -25,33 +25,38 @@ pasted_data = st.sidebar.text_area(
     placeholder="3R C3二組下選抜馬...\n11--\nモズアスコット...\n(コマンズ)..."
 )
 
-# 🚨 ここに「解析ボタン」を設置しました！
+# 解析ボタン
 start_analysis = st.sidebar.button("🚀 レース解析を実行", type="primary")
 
 # ----------------------------------------------------
-# 🌟 【完全解決版】本物の馬番ブロックだけを正確に狙い撃ちするパースロジック
+# 🌟 【完全決着版】改行に依存せず、馬番の塊だけを絶対補足するロジック
 # ----------------------------------------------------
 def parse_netkeiba_perfect(text):
     if not text.strip():
         return []
         
+    # 1. 特殊空白・全角スペースの排除
     cleaned_text = text.replace('\xa0', ' ').replace('\u3000', ' ')
+    
+    # 2. 特殊なハイフン・ダッシュ類をすべて標準の「-」に統一
     cleaned_text = re.sub(r'[–—―─−-]', '-', cleaned_text)
     
-    # 馬番の開始地点（例: 「11--」「22--」など、改行＋数字＋ハイフン2つ）だけを厳密に探す
-    matches = list(re.finditer(r'\n\s*(\d+)--', cleaned_text))
+    # 3. 【修正の核心】改行(\n)の縛りを消去。テキストのどこにあっても「数字+ハイフン2つ以上」を捕捉
+    matches = list(re.finditer(r'(\d+)-{2,}', cleaned_text))
     
     if not matches:
         return []
         
     parsed_entries = []
     
+    # マッチした位置をもとに各馬のブロックを抽出
     for idx, match in enumerate(matches):
         raw_num = match.group(1).strip()
         start_pos = match.end()
         end_pos = matches[idx+1].start() if idx + 1 < len(matches) else len(cleaned_text)
         block_content = cleaned_text[start_pos:end_pos]
         
+        # 枠番混ざりの3桁対応
         maruban = int(raw_num[1:]) if len(raw_num) >= 3 and raw_num.startswith(('1','2','3','4','5','6','7','8')) else int(raw_num)
         lines = [line.strip() for line in block_content.split('\n') if line.strip()]
         if not lines:
@@ -63,14 +68,14 @@ def parse_netkeiba_perfect(text):
         ninki = 10
         time_score = 75.0
         
-        # 1. 脚質の判定
+        # 脚質の判定
         for line in lines[:10]:
             if line in ["逃", "逃げ"]: kyashitsu = "逃げ"; break
             if line in ["先", "先行"]: kyashitsu = "先行"; break
             if line in ["差", "差し"]: kyashitsu = "差し"; break
             if line in ["追", "追い込み"]: kyashitsu = "追い込み"; break
             
-        # 2. オッズと人気の抽出
+        # オッズと人気の抽出
         odds_pattern = re.compile(r'([\d.]+)\s*\(\s*(\d+)\s*人気\s*\)')
         for line in lines[:20]:
             match = odds_pattern.search(line)
@@ -79,7 +84,7 @@ def parse_netkeiba_perfect(text):
                 ninki = int(match.group(2))
                 break
                 
-        # 3. 騎手名の自動抽出
+        # 騎手名の抽出
         known_jockeys = ['藤江渉', '福原杏', '沖響主', '山口達', '笠野雄', '濱田達', '山林堂', '加藤雄', '吉留孝', '本橋孝', '古岡勇', '秋元耕']
         for line in lines[:25]:
             for kj in known_jockeys:
@@ -89,7 +94,7 @@ def parse_netkeiba_perfect(text):
             if jockey != "不明":
                 break
                 
-        # 4. 過去の走破タイムの抽出とスコア化
+        # タイムスコア化
         time_pattern = re.compile(r'ダ\d+\s+(\d+):(\d+\.\d+)')
         times = []
         for line in lines:
@@ -124,14 +129,12 @@ def parse_netkeiba_perfect(text):
 # ----------------------------------------------------
 # 3. メイン処理（デモ表示 or ボタン押下時の解析）
 # ----------------------------------------------------
-# データを貼り付けた状態で、かつボタンが押された場合のみ解析を実行
 if pasted_data.strip() and start_analysis:
     entries = parse_netkeiba_perfect(pasted_data)
     
     if not entries:
         st.error("⚠️ パースに失敗しました。コピーしたデータの範囲か、馬番の表記を確認してください。")
 else:
-    # 初期状態、またはデータ未入力時はデモデータを表示
     if not pasted_data.strip():
         st.info("💡 左のテキストエリアにデータを貼り付けて「🚀 レース解析を実行」を押してください。現在はデモデータを表示中。")
     else:
