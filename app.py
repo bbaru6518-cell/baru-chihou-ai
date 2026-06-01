@@ -1,83 +1,180 @@
 import streamlit as st
+import re
 
 # 1. 画面の基本設定
 st.set_page_config(page_title="Baru競馬AI Pro", page_icon="🎯", layout="wide")
 
 st.title("🎯 Baru競馬AI Pro 〜研究者レベル最終進化版〜")
-st.write("インサイダーオッズ歪み・穴騎手・秋元フィルター完全統合システム")
+st.write("ネット競馬コピペデータ自動パース・インサイダーオッズ歪み・秋元フィルター完全統合システム")
 st.markdown("---")
 
 # ----------------------------------------------------
 # 2. データの入力エリア（画面の左サイドバー）
 # ----------------------------------------------------
 st.sidebar.header("🛠 レース条件設定")
-venue = st.sidebar.selectbox("競馬場", ["船橋", "大井", "川崎", "浦和"])
+venue = st.sidebar.selectbox("競馬場", ["船橋", "大井", "川崎", "浦和"], index=0)
 race_num = st.sidebar.number_input("レース番号", min_value=1, max_value=12, value=3)
-race_class = st.sidebar.selectbox("クラス", ["C3", "C2", "C1", "B3", "A2", "重賞"])
+race_class = st.sidebar.selectbox("クラス", ["C3", "C2", "C1", "B3", "A2", "重賞"], index=0)
 
 st.sidebar.markdown("---")
 
-st.sidebar.header("📋 出馬表（馬柱）データの入力")
+st.sidebar.header("📋 netkeiba 出馬表コピペ入力")
 pasted_data = st.sidebar.text_area(
-    "ここにデータを貼り付けてください",
-    height=200,
-    placeholder="例：\n11 古岡勇樹 先行 1.6 1.1 95.0 1\n4 山口達弥 逃げ 4.5 1.5 88.0 2",
-    help="枠やWEBサイトからコピーしたテキストをそのまま貼り付けられます。"
+    "サイトのテキストを丸ごとここに貼り付けてください",
+    height=300,
+    placeholder="3R C3二組下選抜馬...\n11--\nモズアスコット...\n(コマンズ)..."
 )
 
 # ----------------------------------------------------
-# データ解析用のベースデータ準備（防弾パースロジック）
+# 🌟 ネット競馬縦型コピーデータ専用・超高度パースロジック
 # ----------------------------------------------------
-entries = []
-
-if pasted_data.strip():
-    lines = pasted_data.strip().split("\n")
-    for line in lines:
-        parts = line.split()
-        # 1行に要素が7個以上ない、または最初の要素が数字（馬番）に変換できない行は自動スルー
-        if len(parts) < 7:
+def parse_netkeiba_vertical(text):
+    if not text.strip():
+        return []
+    
+    # 馬番 (例: "11--" や "22--" や "810--") でテキストを分割
+    # ※ネット競馬のコピペ特徴：馬番の後ろに「--」がつくか、8枠10番だと「810--」となる
+    raw_blocks = re.split(r'\n(\d+)--\s*\n', text)
+    
+    if len(raw_blocks) < 3:
+        return []
+    
+    parsed_entries = []
+    
+    # 分割されたブロックをループ処理 (最初のブロックはレース情報ヘッダーなので飛ばす)
+    for i in range(1, len(raw_blocks), 2):
+        raw_num = raw_blocks[i]
+        block_content = raw_blocks[i+1] if i+1 < len(raw_blocks) else ""
+        
+        # 馬番の整形 (例: "810" の場合は最後の2桁 "10" を馬番とする)
+        if len(raw_num) >= 3 and raw_num.startswith(('1','2','3','4','5','6','7','8')):
+            maruban = int(raw_num[1:])
+        else:
+            maruban = int(raw_num)
+            
+        lines = [line.strip() for line in block_content.split('\n') if line.strip()]
+        if not lines:
             continue
             
-        try:
-            # 馬番がちゃんと数字（整数）に変換できるかチェック
-            maruban = int(parts[0])
-            
-            entries.append({
-                'maruban': maruban,
-                'jockey': parts[1],
-                'kyashitsu': parts[2],
-                'tan_odds': float(parts[3]),
-                'fuku_odds_min': float(parts[4]),
-                'time_score': float(parts[5]),
-                'ninki': int(parts[6])
-            })
-        except ValueError:
-            # 「15:45発走」や文字ヘッダーなど、数字に変換できない行が来たらエラーを出さずに無視する
-            continue
+        # --- 各変数の初期化 ---
+        jockey = "不明"
+        kyashitsu = "差"
+        tan_odds = 99.0
+        ninki = 10
+        time_score = 70.0 # デフォルト値
+        
+        # --- 脚質の抽出 (塊の上部にある「逃」「先」「差」「追」を検出) ---
+        for line in lines[:10]:
+            if line in ["逃", "先", "先行", "逃げ", "差", "差し", "追", "追い込み"]:
+                kyashitsu = line
+                if kyashitsu == "先": kyashitsu = "先行"
+                if kyashitsu == "逃": kyashitsu = "逃げ"
+                if kyashitsu == "差": kyashitsu = "差し"
+                if kyashitsu == "追": kyashitsu = "追い込み"
+                break
+                
+        # --- オッズと人気の抽出 (例: "28.3(8人気)" を探す) ---
+        odds_pattern = re.compile(r'([\d.]+)\((\d+)人気\)')
+        for line in lines:
+            match = odds_pattern.search(line)
+            if match:
+                tan_odds = float(match.group(1))
+                ninki = int(match.group(2))
+                break
+                
+        # --- 騎手名の抽出 ---
+        # オッズが書かれている行の「次の行」か「2行下」に騎手名が来ることが多い
+        # または、おなじみの穴騎手リストや減量騎手、カタカナ以外で判定
+        known_jockeys = ['藤江渉', '福原杏', '沖響主', '山口達', '笠野雄', '濱田達', '山林堂', '加藤雄', '吉留孝', '本橋孝', '古岡勇', '秋元耕']
+        for line in lines:
+            # 既知の騎手リストに前方一致するかチェック
+            for kj in known_jockeys:
+                if line.startswith(kj):
+                    jockey = kj
+                    break
+            if jockey != "不明":
+                break
+        
+        # 登録がない騎手の場合のフォールバック（54.02026... のような斤量+日付行の直前の2〜4文字を狙う）
+        if jockey == "不明":
+            for idx, line in enumerate(lines):
+                if re.search(r'\d{2}\.\d\d{4}', line): # "56.02026..." のようなパターン
+                    if idx > 0 and len(lines[idx-1]) <= 4 and not lines[idx-1].endswith('kg'):
+                        jockey = lines[idx-1]
+                        break
 
-    if not entries:
-        st.sidebar.error("⚠️ 正しい形式の馬データ（馬番から始まる7項目）が1頭も見つかりませんでした。入力内容を確認してください。")
-else:
+        # --- 走破タイム（タイムスコア）の抽出 ---
+        # 過去走の「ダ1400 1:35.0」のような表記から、一番最近のタイムを取得してスコア化
+        time_pattern = re.compile(r'ダ\d+\s+(\d+):(\d+\.\d+)')
+        times = []
+        for line in lines:
+            match = time_pattern.search(line)
+            if match:
+                minutes = int(match.group(1))
+                seconds = float(match.group(2))
+                total_seconds = minutes * 60 + seconds
+                times.append(total_seconds)
+        
+        if times:
+            # 直近のレース（最初に見つかったタイム）を基準に、走破AIの仮スコアを算出
+            # 1500mや1400mの基準秒から、速ければ高いスコアにするロジック
+            base_time = 100.0  # 基準秒
+            latest_time = times[0]
+            # タイムが短い(速い)ほどスコアが高くなる計算式
+            time_score = round(100 - (latest_time - base_time) * 2, 1)
+            # スコアの範囲を現実的な 60〜98 に収める調整
+            if time_score > 98: time_score = 98.0
+            if time_score < 60: time_score = 60.0
+        else:
+            time_score = 75.0 # タイムが取れなかった場合は平均値を付与
+            
+        # 複勝下限オッズは単勝オッズから統計的に自動逆算(1/4〜1/3)
+        fuku_odds_min = round(max(1.1, tan_odds * 0.25), 1)
+
+        parsed_entries.append({
+            'maruban': maruban,
+            'jockey': jockey,
+            'kyashitsu': kyashitsu,
+            'tan_odds': tan_odds,
+            'fuku_odds_min': fuku_odds_min,
+            'time_score': time_score,
+            'ninki': ninki
+        })
+        
+    return parsed_entries
+
+# ----------------------------------------------------
+# データの読み込み実行
+# ----------------------------------------------------
+entries = parse_netkeiba_vertical(pasted_data)
+
+if pasted_data.strip() and not entries:
+    st.sidebar.error("⚠️ パースに失敗しました。データの形式が変更された可能性があります。")
+elif not pasted_data.strip():
     st.sidebar.info("💡 現在はテスト用の自動デモデータを読み込んでいます。実際のレース時はここに貼り付けてください。")
     # デフォルトの船橋3Rテストデータ
     entries = [
-        {'maruban': 11, 'ninki': 1,  'tan_odds': 1.6,  'fuku_odds_min': 1.1, 'time_score': 95.0, 'jockey': '古岡勇樹', 'kyashitsu': '先行'},
-        {'maruban': 4,  'ninki': 2,  'tan_odds': 4.5,  'fuku_odds_min': 1.5, 'time_score': 88.0, 'jockey': '山口達弥', 'kyashitsu': '逃げ'},
-        {'maruban': 5,  'ninki': 3,  'tan_odds': 8.9,  'fuku_odds_min': 2.1, 'time_score': 91.5, 'jockey': '笠野雄大', 'kyashitsu': '先行'},
-        {'maruban': 10, 'ninki': 4,  'tan_odds': 14.1, 'fuku_odds_min': 3.0, 'time_score': 82.0, 'jockey': '本橋孝太', 'kyashitsu': '差し'},
+        {'maruban': 11, 'ninki': 8,  'tan_odds': 28.3, 'fuku_odds_min': 4.5, 'time_score': 74.0, 'jockey': '藤江渉',   'kyashitsu': '差し'},
         {'maruban': 2,  'ninki': 5,  'tan_odds': 15.8, 'fuku_odds_min': 3.2, 'time_score': 79.0, 'jockey': '福原杏',   'kyashitsu': '差し'},
-        {'maruban': 9,  'ninki': 6,  'tan_odds': 17.0, 'fuku_odds_min': 3.5, 'time_score': 85.0, 'jockey': '吉留孝司', 'kyashitsu': '差し'},
-        {'maruban': 6,  'ninki': 7,  'tan_odds': 22.2, 'fuku_odds_min': 4.0, 'time_score': 76.0, 'jockey': '濱田達也', 'kyashitsu': '先行'},
-        {'maruban': 1,  'ninki': 8,  'tan_odds': 28.3, 'fuku_odds_min': 4.5, 'time_score': 74.0, 'jockey': '藤江渉',   'kyashitsu': '追い込み'},
-        {'maruban': 8,  'ninki': 9,  'tan_odds': 59.1, 'fuku_odds_min': 6.0, 'time_score': 71.0, 'jockey': '加藤雄真', 'kyashitsu': '逃げ'},
-        {'maruban': 7,  'ninki': 10, 'tan_odds': 72.8, 'fuku_odds_min': 2.5, 'time_score': 80.0, 'jockey': '山林堂信', 'kyashitsu': '差し'},
-        {'maruban': 3,  'ninki': 11, 'tan_odds': 74.0, 'fuku_odds_min': 7.2, 'time_score': 65.0, 'jockey': '秋元耕成', 'kyashitsu': '差し'},
+        {'maruban': 3,  'ninki': 11, 'tan_odds': 74.0, 'fuku_odds_min': 7.2, 'time_score': 65.0, 'jockey': '沖響主',   'kyashitsu': '追い込み'},
+        {'maruban': 4,  'ninki': 2,  'tan_odds': 4.5,  'fuku_odds_min': 1.5, 'time_score': 88.0, 'jockey': '山口達',   'kyashitsu': '差し'},
+        {'maruban': 5,  'ninki': 3,  'tan_odds': 8.9,  'fuku_odds_min': 2.1, 'time_score': 91.5, 'jockey': '笠野雄',   'kyashitsu': '追い込み'},
+        {'maruban': 6,  'ninki': 7,  'tan_odds': 22.2, 'fuku_odds_min': 4.0, 'time_score': 76.0, 'jockey': '濱田達',   'kyashitsu': '追い込み'},
+        {'maruban': 7,  'ninki': 10, 'tan_odds': 72.8, 'fuku_odds_min': 2.5, 'time_score': 80.0, 'jockey': '山林堂',   'kyashitsu': '追い込み'},
+        {'maruban': 8,  'ninki': 9,  'tan_odds': 59.1, 'fuku_odds_min': 6.0, 'time_score': 71.0, 'jockey': '加藤雄',   'kyashitsu': '差し'},
+        {'maruban': 9,  'ninki': 6,  'tan_odds': 17.0, 'fuku_odds_min': 3.5, 'time_score': 85.0, 'jockey': '吉留孝',   'kyashitsu': '差し'},
+        {'maruban': 10, 'ninki': 4,  'tan_odds': 14.1, 'fuku_odds_min': 3.0, 'time_score': 82.0, 'jockey': '本橋孝',   'kyashitsu': '追い込み'},
+        {'maruban': 11, 'ninki': 1,  'tan_odds': 1.6,  'fuku_odds_min': 1.1, 'time_score': 95.0, 'jockey': '古岡勇',   'kyashitsu': '差し'},
     ]
 
 # ----------------------------------------------------
-# 3. AIコア解析ロジック
+# 3. AIコア解析ロジック & 結果表示
 # ----------------------------------------------------
 if entries:
+    # 読み込まれた馬の一覧を綺麗にテーブル表示（デバッグ・確認用）
+    st.subheader("📋 AIが自動認識した出走馬データ一覧")
+    st.dataframe(entries, use_container_width=True)
+
     front_runners = len([h for h in entries if h['kyashitsu'] in ['逃げ', '先行']])
     odds_1st_list = [h['tan_odds'] for h in entries if h['ninki'] == 1]
     odds_3rd_list = [h['tan_odds'] for h in entries if h['ninki'] == 3]
@@ -106,6 +203,7 @@ if entries:
             st.success(f"判定: 🟢 ガチガチ本命（スコア: {turbulence_score}点）")
             st.info("💡 戦略: 1番人気を固定し、点数を極限まで絞るか見送り。")
 
+    # 人気順にソート
     sorted_horses = sorted(entries, key=lambda x: x['ninki'])
     total_horses = len(sorted_horses)
 
@@ -120,9 +218,6 @@ if entries:
         best_time_horse = max(remaining_zone1, key=lambda x: x['time_score'])
         if best_time_horse['jockey'] != '秋元耕成':
             first_row.append(best_time_horse['maruban'])
-        elif len(remaining_zone1) > 1:
-            runner_up = sorted(remaining_zone1, key=lambda x: x['time_score'], reverse=True)[1]
-            first_row.append(runner_up['maruban'])
     first_row.sort()
 
     # --- 【2番：2列目（相手）】 ---
@@ -133,7 +228,7 @@ if entries:
     # --- 【3番：3列目（穴紐フィルター）】 ---
     zone3_pool = sorted_horses[max(0, total_horses-5):]
     third_row = []
-    ana_jockey_master = ['山林堂信', '吉留孝司', '古岡勇樹', '加藤雄真', '藤江渉', '笠野雄大']
+    ana_jockey_master = ['山林堂', '吉留孝', '古岡勇', '加藤雄', '藤江渉', '笠野雄']
 
     with col2:
         st.subheader("🔎 大穴ゾーン個別インサイダー解析")
@@ -187,5 +282,3 @@ if entries:
         st.code(f"2番（相手）　 🔵【 {format_row(second_row)} 】", language="text")
         st.code(f"3番（穴紐）　 🟢【 {format_row(third_row)} 】", language="text")
         st.markdown("---")
-    else:
-        st.warning("買い目が生成されませんでした。条件を緩和してください。")
