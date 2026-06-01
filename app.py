@@ -1,6 +1,6 @@
 import streamlit as st
 
-# 画面の基本設定
+# 1. 画面の基本設定（PC・スマホ両対応）
 st.set_page_config(page_title="Baru競馬AI Pro", page_icon="🎯", layout="wide")
 
 st.title("🎯 Baru競馬AI Pro 〜研究者レベル最終進化版〜")
@@ -8,7 +8,7 @@ st.write("インサイダーオッズ歪み・穴騎手・秋元フィルター�
 st.markdown("---")
 
 # ----------------------------------------------------
-# 1. データの入力エリア（画面側で自由に変更可能）
+# 2. データの入力エリア（画面の左サイドバー）
 # ----------------------------------------------------
 st.sidebar.header("🛠 レース条件設定")
 venue = st.sidebar.selectbox("競馬場", ["船橋", "大井", "川崎", "浦和"])
@@ -16,7 +16,7 @@ race_num = st.sidebar.number_input("レース番号", min_value=1, max_value=12,
 race_class = st.sidebar.selectbox("クラス", ["C3", "C2", "C1", "B3", "A2", "重賞"])
 
 st.sidebar.markdown("---")
-st.sidebar.write("💡 実際のオッズや騎手を画面でシミュレーションできます")
+st.sidebar.write("💡 下記の出馬表データをもとにAIが自動解析します")
 
 # セッション状態に出馬表データを格納（実際の船橋3Rベース＋秋元騎手）
 if 'entries' not in st.session_state:
@@ -37,9 +37,9 @@ if 'entries' not in st.session_state:
 entries = st.session_state.entries
 
 # ----------------------------------------------------
-# 2. AIコア解析ロジック
+# 3. AIコア解析ロジック（裏側で全自動計算）
 # ----------------------------------------------------
-# 2-1. 波乱度予測
+# 3-1. レース波乱度予測
 front_runners = len([h for h in entries if h['kyashitsu'] in ['逃げ', '先行']])
 odds_1st = [h['tan_odds'] for h in entries if h['ninki'] == 1][0]
 odds_3rd = [h['tan_odds'] for h in entries if h['ninki'] == 3][0]
@@ -51,6 +51,7 @@ if front_runners >= 5:  turbulence_score += 40
 elif front_runners <= 2: turbulence_score -= 20
 if odds_gap < 5.0:      turbulence_score += 20
 
+# 画面を2分割して左側に結果、右側にアナライズログを出す
 col1, col2 = st.columns(2)
 
 with col1:
@@ -65,11 +66,11 @@ with col1:
         st.success(f"判定: 🟢 ガチガチ本命（スコア: {turbulence_score}点）")
         st.info("💡 戦略: 1番人気を固定し、点数を極限まで絞るか見送り。")
 
-# 2-2. 各列の選定ロジック
+# 3-2. 各列（1・2・3番）の精密選定
 sorted_horses = sorted(entries, key=lambda x: x['ninki'])
 total_horses = len(sorted_horses)
 
-# 【1列目】
+# --- 【1番：1列目（軸）】 ---
 zone1_pool = sorted_horses[:4]
 horse_1st = [h for h in zone1_pool if h['ninki'] == 1][0]
 remaining_zone1 = [h for h in zone1_pool if h['ninki'] != 1]
@@ -83,12 +84,12 @@ else:
     first_row.append(runner_up['maruban'])
 first_row.sort()
 
-# 【2列目】
+# --- 【2番：2列目（相手）】 ---
 zone2_pool = sorted_horses[3:8]
 second_row = [h['maruban'] for h in zone2_pool if h['jockey'] != '秋元耕成']
 second_row.sort()
 
-# 【3列目】
+# --- 【3番：3列目（穴紐フィルター）】 ---
 zone3_pool = sorted_horses[max(0, total_horses-5):]
 third_row = []
 ana_jockey_master = ['山林堂信', '吉留孝司', '古岡勇樹', '加藤雄真', '藤江渉', '笠野雄大']
@@ -114,23 +115,19 @@ with col2:
             
         if is_selected:
             third_row.append(h['maruban'])
-            st.code(f"⚠️ 馬番:{h['maruban']:02d} ({h['jockey']}) -> 採用 [{', '.join(reasons)}]")
+            st.code(f"⚠️ 馬番:{h['maruban']:02d} ({h['jockey']}) -> 採用 [{', '.join(reasons)}]", language="text")
         else:
             st.text(f"💤 馬番:{h['maruban']:02d} ({h['jockey']}) -> 武器不足で見送り")
             
     third_row.sort()
 
 # ----------------------------------------------------
-# 3. フォーメーション組み合わせ生成＆グループ表示（UI最適化）
+# 4. 点数計算＆マークシート配置出力（バルさん指定デザイン）
 # ----------------------------------------------------
 st.markdown("---")
-st.subheader("🎯 【最終出力】Baru式・最適化3連複フォーメーション")
+st.subheader("🎯 【最終出力】Baru式・3連複フォーメーション配置（投票画面用）")
 
-col_f1, col_f2, col_f3 = st.columns(3)
-col_f1.metric("1列目（軸）", ", ".join(map(str, first_row)))
-col_f2.metric("2列目（相手）", ", ".join(map(str, second_row)))
-col_f3.metric("3列目（穴紐）", ", ".join(map(str, third_row)))
-
+# 裏側での重複目を排除した点数計算ロジック
 final_tickets = set()
 for r1 in first_row:
     for r2 in second_row:
@@ -138,23 +135,22 @@ for r1 in first_row:
             if r1 != r2 and r1 != r3 and r2 != r3:
                 ticket = tuple(sorted([r1, r2, r3]))
                 final_tickets.add(ticket)
-                
 sorted_tickets = sorted(list(final_tickets))
 
 st.success(f"🔥 重複目を自動排除した【合計購入点数: {len(sorted_tickets)} 点】")
 
 if sorted_tickets:
-    # 軸馬ごとにブロックを分けてきれいに並べる
-    for jiku in first_row:
-        st.markdown(f"### 🐴 【{jiku}番 軸】の組み合わせ")
-        
-        # この軸馬が含まれる馬券のみを抽出し、昇順で確定
-        jiku_tickets = [t for t in sorted_tickets if jiku in t]
-        
-        # 1行に4点ずつ、すっきり縦一列の流れを作る
-        cols = st.columns(4)
-        for idx, t in enumerate(jiku_tickets):
-            with cols[idx % 4]:
-                st.code(f"🎟 {t[0]:02d} - {t[1]:02d} - {t[2]:02d}", language="text")
+    # 馬番のリストを「見やすいスペース区切りの2桁文字列」に変換する関数
+    def format_row(row_list):
+        return "　".join([f"{num:02d}" for num in row_list])
+
+    # バルさんの理想の形「1番 〇〇」「2番 〇〇」を等間隔スペースで完全再現
+    st.code(f"1番（軸）　　 🔴【 {format_row(first_row)} 】", language="text")
+    st.code(f"2番（相手）　 🔵【 {format_row(second_row)} 】", language="text")
+    st.code(f"3番（穴紐）　 🟢【 {format_row(third_row)} 】", language="text")
+    
+    st.markdown("---")
+    st.caption("※ネット投票（SPAT4等）のフォーメーション画面を開き、上記の通りにチェックを入れれば完了です。")
+
 else:
     st.warning("買い目が生成されませんでした。条件を緩和してください。")
