@@ -5,7 +5,7 @@ import re
 st.set_page_config(page_title="Baru競馬AI Pro", page_icon="🎯", layout="wide")
 
 st.title("🎯 Baru競馬AI Pro 〜研究者レベル最終進化版〜")
-st.write("ネット競馬コピペデータ自動パース・インサイダーオッズ歪み・秋元フィルター完全統合システム")
+st.write("netkeiba過去走パース・逃げ穴激走軸固定・秋元フィルター完全統合システム")
 st.markdown("---")
 
 # ----------------------------------------------------
@@ -29,9 +29,9 @@ pasted_data = st.sidebar.text_area(
 start_analysis = st.sidebar.button("🚀 レース解析を実行", type="primary")
 
 # ----------------------------------------------------
-# 🌟 脚質・オッズ完全追従型パースロジック
+# 🌟 【超進化】過去走通過順位・追従型パースロジック
 # ----------------------------------------------------
-def parse_netkeiba_v4(text):
+def parse_netkeiba_v5(text):
     if not text.strip():
         return []
         
@@ -77,17 +77,37 @@ def parse_netkeiba_v4(text):
     
     for maruban, lines in horse_blocks:
         jockey = "不明"
-        kyashitsu = "差し"  
+        kyashitsu = "差し"  # デフォルト値
+        has_front_run_history = False # 過去に逃げ・先行した実績があるかフラグ
         tan_odds = 99.0
         ninki = 10
         time_score = 75.0
         
+        # 1. 基本脚質プロフィールの判定
         for line in lines[:15]:
             if line in ["逃", "逃げ"] or " 逃 " in f" {line} ": kyashitsu = "逃げ"; break
             if line in ["先", "先行"] or " 先 " in f" {line} ": kyashitsu = "先行"; break
             if line in ["差", "差し"] or " 差 " in f" {line} ": kyashitsu = "差し"; break
             if line in ["追", "追い込み"] or " 追 " in f" {line} ": kyashitsu = "追い込み"; break
             
+        # 🔥【超重要】netkeibaの過去走データから「コーナー通過順位」を死守パース！
+        # 例：「1-1-1-1」や「2-2」、「1-2-3」のようなパターンを全行から探索
+        corner_pattern = re.compile(r'(\d{1,2})-(\d{1,2})')
+        for line in lines:
+            match_corner = corner_pattern.search(line)
+            if match_corner:
+                # 最初のコーナー、または2つ目のコーナーで3番手以内（1, 2, 3番手）にいた場合
+                pos1 = int(match_corner.group(1))
+                pos2 = int(match_corner.group(2))
+                if pos1 <= 3 or pos2 <= 3:
+                    has_front_run_history = True
+                    break
+
+        # 過去走で前に行けていれば、脚質を「逃げ・先行実績あり」に強力補正！
+        if has_front_run_history and kyashitsu not in ["逃げ", "先行"]:
+            kyashitsu = "逃げ・先行（過去実績あり）"
+
+        # 2. オッズと人気の抽出
         odds_pattern = re.compile(r'([\d.]+)\s*[\(（]\s*(\d+)\s*人気\s*[\)）]')
         for line in lines[:25]:
             match = odds_pattern.search(line)
@@ -96,6 +116,7 @@ def parse_netkeiba_v4(text):
                 ninki = int(match.group(2))
                 break
                 
+        # 3. 騎手名の抽出
         known_jockeys = ['藤江渉', '福原杏', '沖響主', '山口達', '笠野雄', '濱田達', '山林堂', '加藤雄', '吉留孝', '本橋孝', '古岡勇', '秋元耕', '篠谷葵', '小杉亮', '町田直', '和田譲', '岡村健', '川島正', '野澤憲', '山中悠', '山本大', '木間塚']
         for line in lines[:30]:
             for kj in known_jockeys:
@@ -105,6 +126,7 @@ def parse_netkeiba_v4(text):
             if jockey != "不明":
                 break
                 
+        # 4. タイムスコア化
         time_pattern = re.compile(r'ダ\d+\s+(\d+):(\d+\.\d+)')
         times = []
         for line in lines:
@@ -134,23 +156,23 @@ def parse_netkeiba_v4(text):
     return sorted(parsed_entries, key=lambda x: x['maruban'])
 
 # ----------------------------------------------------
-# 3. メイン処理（変数の初期化位置を修正）
+# 3. メイン処理（デモデータにも反映）
 # ----------------------------------------------------
-entries = [] # エラー防止：最初に空のリストを定義しておく
+entries = []
 
 if pasted_data.strip() and start_analysis:
-    entries = parse_netkeiba_v4(pasted_data)
+    entries = parse_netkeiba_v5(pasted_data)
     if not entries:
-        st.error("⚠️ パースに失敗しました。コピーしたデータの範囲か、馬番の表記を確認してください。")
+        st.error("⚠️ パースに失敗しました。データを確認してください。")
 else:
     if not pasted_data.strip():
         st.info("💡 左のテキストエリアにデータを貼り付けて「🚀 レース解析を実行」を押してください。現在はデモデータを表示中。")
     else:
         st.warning("👈 データを貼り付けたら、左サイドバーの下にある「🚀 レース解析を実行」ボタンを押してください！")
         
-    # 初期デモデータ
+    # デモデータ：1番をバルさん指定の「過去に逃げ実績がある状態」にセット
     entries = [
-        {'maruban': 1,  'ninki': 7,  'tan_odds': 45.5, 'fuku_odds_min': 11.4, 'time_score': 95.6, 'jockey': '篠谷葵',   'kyashitsu': '差し'},
+        {'maruban': 1,  'ninki': 7,  'tan_odds': 45.5, 'fuku_odds_min': 11.4, 'time_score': 95.6, 'jockey': '篠谷葵',   'kyashitsu': '逃げ・先行（過去実績あり）'},
         {'maruban': 2,  'ninki': 10, 'tan_odds': 168.7,'fuku_odds_min': 42.2, 'time_score': 67.6, 'jockey': '小杉亮',   'kyashitsu': '追い込み'},
         {'maruban': 3,  'ninki': 8,  'tan_odds': 54.1, 'fuku_odds_min': 13.5, 'time_score': 60.0, 'jockey': '町田直',   'kyashitsu': '差し'},
         {'maruban': 4,  'ninki': 5,  'tan_odds': 23.0, 'fuku_odds_min': 5.8,  'time_score': 95.2, 'jockey': '和田譲',   'kyashitsu': '差し'},
@@ -164,21 +186,23 @@ else:
     ]
 
 # ----------------------------------------------------
-# 4. AIコア解析ロジック & 結果表示
+# 4. AIコア解析ロジック & 厳選フォーメーション表示
 # ----------------------------------------------------
 if entries:
     st.subheader("📋 AIが自動認識した出走馬データ一覧")
     st.dataframe(entries, use_container_width=True)
 
-    front_runners = len([h for h in entries if h['kyashitsu'] in ['逃げ', '先行']])
+    # 逃げ・先行馬のカウント（過去実績持ちも含む）
+    front_runners_list = [h for h in entries if "逃げ" in h['kyashitsu'] or "先行" in h['kyashitsu']]
+    front_runners = len(front_runners_list)
+    
     odds_1st_list = [h['tan_odds'] for h in entries if h['ninki'] == 1]
     odds_3rd_list = [h['tan_odds'] for h in entries if h['ninki'] == 3]
-    
     odds_1st = odds_1st_list[0] if odds_1st_list else 2.0
     odds_3rd = odds_3rd_list[0] if odds_3rd_list else 6.0
     odds_gap = odds_3rd - odds_1st
 
-    # 波乱度スコア
+    # 波乱度
     turbulence_score = 0
     if race_class in ['C3', '3歳']: turbulence_score += 25
     if front_runners >= 4:  turbulence_score += 30
@@ -188,30 +212,52 @@ if entries:
 
     with col1:
         st.subheader("📊 レース構造解析結果")
-        st.write(f"先行馬数: {front_runners}頭 ／ 1番人気オッズ: {odds_1st} ／ オッズ差: {round(odds_gap, 1)}")
+        st.write(f"先行・逃げ馬数: {front_runners}頭 ／ 1番人気オッズ: {odds_1st}")
         if turbulence_score >= 50:
             st.error(f"判定: 🔥 紐荒れ・大荒れ警戒（スコア: {turbulence_score}点）")
         else:
             st.success(f"判定: 🟢 比較的平穏（スコア: {turbulence_score}点）")
 
     sorted_horses = sorted(entries, key=lambda x: x['ninki'])
-    total_horses = len(sorted_horses)
-
-    # 1列目（軸）：★1番人気のみ（超硬実の軸1頭固定）
-    first_row = [sorted_horses[0]['maruban']] 
     
-    # 2列目（相手）：人気2位〜5位までにギュッと凝縮（4頭）
-    second_row = [h['maruban'] for h in sorted_horses[1:5] if h['jockey'] != '秋元耕成']
-    second_row = sorted(list(set(second_row)))
+    # ====================================================
+    # 🔥 【バルさん流・究極の厳選軸選定アルゴリズム】
+    # ====================================================
+    first_row = []
+    escape_ana_maruban = None
+    
+    # 「過去に逃げ・先行した実績」があり、かつ「単勝10倍以上50倍未満」の絶妙な穴馬を1頭だけ探索
+    for h in entries:
+        if ("逃げ" in h['kyashitsu'] or "先行" in h['kyashitsu']) and (10.0 <= h['tan_odds'] < 50.0):
+            escape_ana_maruban = h['maruban']
+            break # 最も若い馬番の穴馬を最優先で1頭ピックアップ
 
-    # 3列目（穴紐）：インサイダー歪み・激走馬をさらに厳選
+    # 1列目（軸）の確定
+    if escape_ana_maruban:
+        # 💥バルさん指定：逃げ残る穴馬候補がいれば、それを「単独軸1頭」として最優先設定！
+        first_row = [escape_ana_maruban]
+    else:
+        # 該当する逃げ穴馬がいない平穏なレースなら、堅実に1番人気を単独軸1頭にする
+        first_row = [sorted_horses[0]['maruban']]
+
+    # 2列目（相手）：人気2位〜5位までの4頭（軸馬がここに入っている場合は除外）
+    second_row = [h['maruban'] for h in sorted_horses[0:5] if h['maruban'] != first_row[0] and h['jockey'] != '秋元耕成']
+    second_row = sorted(list(set(second_row[:4])))
+
+    # 3列目（穴紐）：インサイダー歪み馬・人気上位の滑り込み
     third_row = []
     ana_jockey_master = ['山林堂', '吉留孝', '古岡勇', '加藤雄', '藤江渉', '笠野雄', '木間塚', '篠谷葵']
 
     with col2:
-        st.subheader("🔎 大穴ゾーン個別インサイダー解析")
+        st.subheader("🔎 軸馬選定 & 大穴ゾーン個別インサイダー解析")
+        
+        if escape_ana_maruban:
+            st.warning(f"👑 【激走軸抜擢】馬番:{escape_ana_maruban:02d} は過去に逃げ・先行実績のある爆弾穴馬です。本日の単独軸に指定しました！")
+        else:
+            st.info(f"🟢 逃げ穴馬不在のため、1番人気 馬番:{first_row[0]:02d} を安全に軸固定しました。")
+
         for h in entries:
-            if h['jockey'] == '秋元耕成':
+            if h['jockey'] == '秋元耕成' or h['maruban'] == first_row[0]:
                 continue
             is_selected = False
             reasons = []
@@ -227,7 +273,7 @@ if entries:
                 if h['time_score'] >= 95.0:
                     hit_count += 1; reasons.append("激走タイム")
                 
-                if hit_count >= 2 or (h['tan_odds'] <= 50.0 and hit_count >= 1):
+                if hit_count >= 2 or (h['tan_odds'] <= 60.0 and hit_count >= 1):
                     is_selected = True
                 
             if is_selected:
