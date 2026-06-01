@@ -17,7 +17,6 @@ race_class = st.sidebar.selectbox("クラス", ["C3", "C2", "C1", "B3", "A2", "�
 
 st.sidebar.markdown("---")
 
-# 【新機能】ここにネット競馬などの馬柱テキストをコピペできるようにする
 st.sidebar.header("📋 出馬表（馬柱）データの入力")
 pasted_data = st.sidebar.text_area(
     "ここにデータを貼り付けてください",
@@ -27,33 +26,40 @@ pasted_data = st.sidebar.text_area(
 )
 
 # ----------------------------------------------------
-# データ解析用のベースデータ準備（コピペがない場合はデフォルトを使用）
+# データ解析用のベースデータ準備（防弾パースロジック）
 # ----------------------------------------------------
 entries = []
 
 if pasted_data.strip():
-    # バルさんが貼り付けたテキストを1行ずつ解析（パース）するロジック
-    try:
-        lines = pasted_data.strip().split("\n")
-        for line in lines:
-            parts = line.split()
-            if len(parts) >= 7:
-                entries.append({
-                    'maruban': int(parts[0]),
-                    'jockey': parts[1],
-                    'kyashitsu': parts[2],
-                    'tan_odds': float(parts[3]),
-                    'fuku_odds_min': float(parts[4]),
-                    'time_score': float(parts[5]),
-                    'ninki': int(parts[6])
-                })
-        if not entries:
-            st.sidebar.error("⚠️ データの形式が正しくありません。スペース区切りで入力してください。")
-    except Exception as e:
-        st.sidebar.error(f"⚠️ データ解析エラー: {e}")
+    lines = pasted_data.strip().split("\n")
+    for line in lines:
+        parts = line.split()
+        # 1行に要素が7個以上ない、または最初の要素が数字（馬番）に変換できない行は自動スルー
+        if len(parts) < 7:
+            continue
+            
+        try:
+            # 馬番がちゃんと数字（整数）に変換できるかチェック
+            maruban = int(parts[0])
+            
+            entries.append({
+                'maruban': maruban,
+                'jockey': parts[1],
+                'kyashitsu': parts[2],
+                'tan_odds': float(parts[3]),
+                'fuku_odds_min': float(parts[4]),
+                'time_score': float(parts[5]),
+                'ninki': int(parts[6])
+            })
+        except ValueError:
+            # 「15:45発走」や文字ヘッダーなど、数字に変換できない行が来たらエラーを出さずに無視する
+            continue
+
+    if not entries:
+        st.sidebar.error("⚠️ 正しい形式の馬データ（馬番から始まる7項目）が1頭も見つかりませんでした。入力内容を確認してください。")
 else:
     st.sidebar.info("💡 現在はテスト用の自動デモデータを読み込んでいます。実際のレース時はここに貼り付けてください。")
-    # コピペが空の時は、いつもの船橋3Rのテストデータを入れる
+    # デフォルトの船橋3Rテストデータ
     entries = [
         {'maruban': 11, 'ninki': 1,  'tan_odds': 1.6,  'fuku_odds_min': 1.1, 'time_score': 95.0, 'jockey': '古岡勇樹', 'kyashitsu': '先行'},
         {'maruban': 4,  'ninki': 2,  'tan_odds': 4.5,  'fuku_odds_min': 1.5, 'time_score': 88.0, 'jockey': '山口達弥', 'kyashitsu': '逃げ'},
@@ -72,7 +78,6 @@ else:
 # 3. AIコア解析ロジック
 # ----------------------------------------------------
 if entries:
-    # 3-1. レース波乱度予測
     front_runners = len([h for h in entries if h['kyashitsu'] in ['逃げ', '先行']])
     odds_1st_list = [h['tan_odds'] for h in entries if h['ninki'] == 1]
     odds_3rd_list = [h['tan_odds'] for h in entries if h['ninki'] == 3]
@@ -99,9 +104,8 @@ if entries:
             st.info("💡 戦略: 2列目の4〜8番人気を厚めに。バランス型の布陣。")
         else:
             st.success(f"判定: 🟢 ガチガチ本命（スコア: {turbulence_score}点）")
-            st.info("💡 戦合法: 1番人気を固定し、点数を極限まで絞るか見送り。")
+            st.info("💡 戦略: 1番人気を固定し、点数を極限まで絞るか見送り。")
 
-    # 3-2. 各列（1・2・3番）の選定
     sorted_horses = sorted(entries, key=lambda x: x['ninki'])
     total_horses = len(sorted_horses)
 
