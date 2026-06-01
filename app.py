@@ -29,13 +29,12 @@ pasted_data = st.sidebar.text_area(
 start_analysis = st.sidebar.button("🚀 レース解析を実行", type="primary")
 
 # ----------------------------------------------------
-# 🌟 【修正版】タブ・空白対応型 鉄壁パースロジック
+# 🌟 【改良版】脚質・オッズ完全追従型パースロジック
 # ----------------------------------------------------
-def parse_netkeiba_v3(text):
+def parse_netkeiba_v4(text):
     if not text.strip():
         return []
         
-    # 表記揺れとタブを通常の半角スペースに統一
     cleaned_text = text.replace('\xa0', ' ').replace('\u3000', ' ').replace('\t', ' ')
     raw_lines = cleaned_text.split('\n')
     
@@ -43,8 +42,6 @@ def parse_netkeiba_v3(text):
     current_block = []
     current_maruban = None
     
-    # 枠番 馬番 -- の並びを確実に捕まえる正規表現 (例: "1   1   --" や "1 1 --")
-    # 行頭にスペースがあっても対応
     block_start_pattern = re.compile(r'^\s*(\d{1,2})\s+(\d{1,2})\s*--')
     
     for line in raw_lines:
@@ -52,7 +49,6 @@ def parse_netkeiba_v3(text):
         if not line_str:
             continue
             
-        # 「※結果・成績・オッズなどのデータは…」以降のフッターは解析しない
         if "※結果" in line_str or "netkeiba" in line_str or "データ分析" in line_str:
             if current_maruban is not None and current_block:
                 horse_blocks.append((current_maruban, current_block))
@@ -62,18 +58,15 @@ def parse_netkeiba_v3(text):
             
         match_block = block_start_pattern.match(line_str)
         if match_block:
-            # 新しい馬のブロックの始まり
             if current_maruban is not None and current_block:
                 horse_blocks.append((current_maruban, current_block))
-            
-            current_maruban = int(match_block.group(2)) # 2番目の数字が馬番
+            current_maruban = int(match_block.group(2))
             current_block = [line_str]
             continue
             
         if current_maruban is not None:
             current_block.append(line_str)
             
-    # 最後の1頭分を追加
     if current_maruban is not None and current_block:
         horse_blocks.append((current_maruban, current_block))
         
@@ -82,7 +75,6 @@ def parse_netkeiba_v3(text):
         
     parsed_entries = []
     
-    # 各馬のブロックを解析
     for maruban, lines in horse_blocks:
         jockey = "不明"
         kyashitsu = "差し"  
@@ -90,14 +82,14 @@ def parse_netkeiba_v3(text):
         ninki = 10
         time_score = 75.0
         
-        # 脚質の判定
+        # 【強化】脚質の判定：独立した行、または複合行から確実に抽出
         for line in lines[:15]:
-            if line in ["逃", "逃げ"]: kyashitsu = "逃げ"; break
-            if line in ["先", "先行"]: kyashitsu = "先行"; break
-            if line in ["差", "差し"]: kyashitsu = "差し"; break
-            if line in ["追", "追い込み"]: kyashitsu = "追い込み"; break
+            if line in ["逃", "逃げ"] or " 逃 " in f" {line} ": kyashitsu = "逃げ"; break
+            if line in ["先", "先行"] or " 先 " in f" {line} ": kyashitsu = "先行"; break
+            if line in ["差", "差し"] or " 差 " in f" {line} ": kyashitsu = "差し"; break
+            if line in ["追", "追い込み"] or " 追 " in f" {line} ": kyashitsu = "追い込み"; break
             
-        # オッズと人気の抽出 (例: "45.5 (7人気)")
+        # オッズと人気の抽出
         odds_pattern = re.compile(r'([\d.]+)\s*[\(（]\s*(\d+)\s*人気\s*[\)）]')
         for line in lines[:25]:
             match = odds_pattern.search(line)
@@ -116,7 +108,7 @@ def parse_netkeiba_v3(text):
             if jockey != "不明":
                 break
                 
-        # タイムスコア化 (過去走の「1:16.1」などのタイムを抽出)
+        # タイムスコア化
         time_pattern = re.compile(r'ダ\d+\s+(\d+):(\d+\.\d+)')
         times = []
         for line in lines:
@@ -128,7 +120,6 @@ def parse_netkeiba_v3(text):
                 
         if times:
             latest_time = times[0]
-            # 1200mの基準タイムを76秒近辺としてスコア化
             time_score = round(100 - (latest_time - 76.0) * 2, 1)
             time_score = max(60.0, min(98.0, time_score))
 
@@ -150,7 +141,7 @@ def parse_netkeiba_v3(text):
 # 3. メイン処理
 # ----------------------------------------------------
 if pasted_data.strip() and start_analysis:
-    entries = parse_netkeiba_v3(pasted_data)
+    entries = parse_netkeiba_v4(pasted_data)
     
     if not entries:
         st.error("⚠️ パースに失敗しました。コピーしたデータの範囲か、馬番の表記を確認してください。")
@@ -160,9 +151,18 @@ else:
     else:
         st.warning("👈 データを貼り付けたら、左サイドバーの下にある「🚀 レース解析を実行」ボタンを押してください！")
         
+    # デモ用：今回頂いた1Rの確定データを初期値としてセット
     entries = [
         {'maruban': 1,  'ninki': 7,  'tan_odds': 45.5, 'fuku_odds_min': 11.4, 'time_score': 95.6, 'jockey': '篠谷葵',   'kyashitsu': '差し'},
+        {'maruban': 2,  'ninki': 10, 'tan_odds': 168.7,'fuku_odds_min': 42.2, 'time_score': 67.6, 'jockey': '小杉亮',   'kyashitsu': '追い込み'},
+        {'maruban': 3,  'ninki': 8,  'tan_odds': 54.1, 'fuku_odds_min': 13.5, 'time_score': 60.0, 'jockey': '町田直',   'kyashitsu': '差し'},
+        {'maruban': 4,  'ninki': 5,  'tan_odds': 23.0, 'fuku_odds_min': 5.8,  'time_score': 95.2, 'jockey': '和田譲',   'kyashitsu': '差し'},
+        {'maruban': 5,  'ninki': 2,  'tan_odds': 4.0,  'fuku_odds_min': 1.0,  'time_score': 97.6, 'jockey': '岡村健',   'kyashitsu': '追い込み'},
         {'maruban': 6,  'ninki': 1,  'tan_odds': 1.3,  'fuku_odds_min': 1.1,  'time_score': 97.8, 'jockey': '川島正',   'kyashitsu': '差し'},
+        {'maruban': 7,  'ninki': 11, 'tan_odds': 170.4,'fuku_odds_min': 42.6, 'time_score': 89.8, 'jockey': '野澤憲',   'kyashitsu': '差し'},
+        {'maruban': 8,  'ninki': 4,  'tan_odds': 22.2, 'fuku_odds_min': 5.5,  'time_score': 96.0, 'jockey': '山中悠',   'kyashitsu': '差し'},
+        {'maruban': 9,  'ninki': 6,  'tan_odds': 41.2, 'fuku_odds_min': 10.3, 'time_score': 60.0, 'jockey': '山本大',   'kyashitsu': '差し'},
+        {'maruban': 10, 'ninki': 9,  'tan_odds': 62.0, 'fuku_odds_min': 15.5, 'time_score': 95.2, 'jockey': '木間塚',   'kyashitsu': '追い込み'},
         {'maruban': 11, 'ninki': 3,  'tan_odds': 10.7, 'fuku_odds_min': 2.7,  'time_score': 94.4, 'jockey': '古岡勇',   'kyashitsu': '追い込み'},
     ]
 
@@ -181,10 +181,10 @@ if entries:
     odds_3rd = odds_3rd_list[0] if odds_3rd_list else 6.0
     odds_gap = odds_3rd - odds_1st
 
+    # 波乱度スコアの計算
     turbulence_score = 0
-    if race_class == 'C3': turbulence_score += 25
-    if front_runners >= 5:  turbulence_score += 40
-    elif front_runners <= 2: turbulence_score -= 20
+    if race_class in ['C3', '3歳']: turbulence_score += 25
+    if front_runners >= 4:  turbulence_score += 30
     if odds_gap < 5.0:      turbulence_score += 20
 
     col1, col2 = st.columns(2)
@@ -192,58 +192,52 @@ if entries:
     with col1:
         st.subheader("📊 レース構造解析結果")
         st.write(f"先行馬数: {front_runners}頭 ／ 1番人気オッズ: {odds_1st} ／ オッズ差: {round(odds_gap, 1)}")
-        if turbulence_score >= 60:
-            st.error(f"判定: 🔥 大荒れ警戒（スコア: {turbulence_score}点）")
-        elif 20 <= turbulence_score < 60:
-            st.warning(f"判定: ⚖️ 中穴傾向（スコア: {turbulence_score}点）")
+        if turbulence_score >= 50:
+            st.error(f"判定: 🔥 紐荒れ・大荒れ警戒（スコア: {turbulence_score}点）")
         else:
-            st.success(f"判定: 🟢 ガチガチ本命（スコア: {turbulence_score}点）")
+            st.success(f"判定: 🟢 比較的平穏（スコア: {turbulence_score}点）")
 
     sorted_horses = sorted(entries, key=lambda x: x['ninki'])
     total_horses = len(sorted_horses)
 
-    # 1列目（軸）
-    zone1_pool = sorted_horses[:4]
-    horse_1st = sorted_horses[0]
-    remaining_zone1 = [h for h in zone1_pool if h['maruban'] != horse_1st['maruban']]
-    
-    first_row = [horse_1st['maruban']]
-    if remaining_zone1:
-        best_time_horse = max(remaining_zone1, key=lambda x: x['time_score'])
-        if best_time_horse['jockey'] != '秋元耕成':
-            first_row.append(best_time_horse['maruban'])
-    first_row.sort()
+    # --- 🔵 フォーメーション選出アルゴリズムの緩和とワイド化 ---
+    # 1列目（軸）：上位人気3頭＋タイムスコア最上位
+    first_row = [h['maruban'] for h in sorted_horses[:3]]
+    best_time_horse = max(entries, key=lambda x: x['time_score'])
+    first_row.append(best_time_horse['maruban'])
+    first_row = sorted(list(set(first_row)))
 
-    # 2列目（相手）
-    zone2_pool = sorted_horses[3:8] if total_horses >= 8 else sorted_horses[1:]
-    second_row = [h['maruban'] for h in zone2_pool if h['jockey'] != '秋元耕成']
-    second_row.sort()
+    # 2列目（相手）：人気4位〜8位までを広く網羅
+    second_row = [h['maruban'] for h in sorted_horses[1:8] if h['jockey'] != '秋元耕成']
+    second_row = sorted(list(set(second_row)))
 
-    # 3列目（穴紐フィルター）
-    zone3_pool = sorted_horses[max(0, total_horses-5):]
+    # 3列目（穴紐）：インサイダー歪み馬 ＋ 穴騎手をすべて集約
     third_row = []
-    ana_jockey_master = ['山林堂', '吉留孝', '古岡勇', '加藤雄', '藤江渉', '笠野雄']
+    ana_jockey_master = ['山林堂', '吉留孝', '古岡勇', '加藤雄', '藤江渉', '笠野雄', '木間塚', '篠谷葵']
 
     with col2:
         st.subheader("🔎 大穴ゾーン個別インサイダー解析")
-        for h in zone3_pool:
+        for h in entries:
             if h['jockey'] == '秋元耕成':
-                st.text(f"❌ 馬番:{h['maruban']:02d} -> 強制排除")
                 continue
             is_selected = False
             reasons = []
-            if h['tan_odds'] >= 25.0 and h['fuku_odds_min'] <= 3.5:
+            
+            # 複勝オッズが単勝の割に売れている（歪み検知）
+            if h['tan_odds'] >= 20.0 and h['fuku_odds_min'] <= (h['tan_odds'] * 0.26):
                 is_selected = True; reasons.append("複勝歪み")
+            # 地方の隠れた穴騎手
             if h['jockey'] in ana_jockey_master:
                 is_selected = True; reasons.append(f"穴騎手({h['jockey']})")
-            if turbulence_score >= 60:
-                is_selected = True; reasons.append("大荒れ救済")
+            # 爆弾タイム持ち
+            if h['time_score'] >= 95.0 and h['ninki'] >= 5:
+                is_selected = True; reasons.append("激走タイム")
                 
             if is_selected:
                 third_row.append(h['maruban'])
                 st.code(f"⚠️ 馬番:{h['maruban']:02d} -> 採用 [{', '.join(reasons)}]", language="text")
                 
-        third_row.sort()
+        third_row = sorted(list(set(third_row)))
 
     # 5. 点数計算＆出力
     st.markdown("---")
