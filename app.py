@@ -1,3 +1,168 @@
+import streamlit as st
+import re
+
+# 1. 画面の基本設定
+st.set_page_config(page_title="Baru競馬AI Pro", page_icon="🎯", layout="wide")
+
+st.title("🎯 Baru競馬AI Pro 〜研究者レベル最終進化版〜")
+st.write("ネット競馬コピペデータ自動パース・インサイダーオッズ歪み・秋元フィルター完全統合システム")
+st.markdown("---")
+
+# ----------------------------------------------------
+# 2. データの入力エリア（画面の左サイドバー）
+# ----------------------------------------------------
+st.sidebar.header("🛠 レース条件設定")
+venue = st.sidebar.selectbox("競馬場", ["船橋", "大井", "川崎", "浦和"], index=0)
+race_num = st.sidebar.number_input("レース番号", min_value=1, max_value=12, value=1)
+race_class = st.sidebar.selectbox("クラス", ["3歳", "C3", "C2", "C1", "B3", "A2", "重賞"], index=0)
+
+st.sidebar.markdown("---")
+
+st.sidebar.header("📋 netkeiba 出馬表コピペ入力")
+pasted_data = st.sidebar.text_area(
+    "サイトのテキストを丸ごとここに貼り付けてください",
+    height=300,
+    placeholder="データを貼り付けてください"
+)
+
+# 解析ボタン
+start_analysis = st.sidebar.button("🚀 レース解析を実行", type="primary")
+
+# ----------------------------------------------------
+# 🌟 脚質・オッズ完全追従型パースロジック
+# ----------------------------------------------------
+def parse_netkeiba_v4(text):
+    if not text.strip():
+        return []
+        
+    cleaned_text = text.replace('\xa0', ' ').replace('\u3000', ' ').replace('\t', ' ')
+    raw_lines = cleaned_text.split('\n')
+    
+    horse_blocks = []
+    current_block = []
+    current_maruban = None
+    
+    block_start_pattern = re.compile(r'^\s*(\d{1,2})\s+(\d{1,2})\s*--')
+    
+    for line in raw_lines:
+        line_str = line.strip()
+        if not line_str:
+            continue
+            
+        if "※結果" in line_str or "netkeiba" in line_str or "データ分析" in line_str:
+            if current_maruban is not None and current_block:
+                horse_blocks.append((current_maruban, current_block))
+                current_maruban = None
+                current_block = []
+            continue
+            
+        match_block = block_start_pattern.match(line_str)
+        if match_block:
+            if current_maruban is not None and current_block:
+                horse_blocks.append((current_maruban, current_block))
+            current_maruban = int(match_block.group(2))
+            current_block = [line_str]
+            continue
+            
+        if current_maruban is not None:
+            current_block.append(line_str)
+            
+    if current_maruban is not None and current_block:
+        horse_blocks.append((current_maruban, current_block))
+        
+    if not horse_blocks:
+        return []
+        
+    parsed_entries = []
+    
+    for maruban, lines in horse_blocks:
+        jockey = "不明"
+        kyashitsu = "差し"  
+        tan_odds = 99.0
+        ninki = 10
+        time_score = 75.0
+        
+        for line in lines[:15]:
+            if line in ["逃", "逃げ"] or " 逃 " in f" {line} ": kyashitsu = "逃げ"; break
+            if line in ["先", "先行"] or " 先 " in f" {line} ": kyashitsu = "先行"; break
+            if line in ["差", "差し"] or " 差 " in f" {line} ": kyashitsu = "差し"; break
+            if line in ["追", "追い込み"] or " 追 " in f" {line} ": kyashitsu = "追い込み"; break
+            
+        odds_pattern = re.compile(r'([\d.]+)\s*[\(（]\s*(\d+)\s*人気\s*[\)）]')
+        for line in lines[:25]:
+            match = odds_pattern.search(line)
+            if match:
+                tan_odds = float(match.group(1))
+                ninki = int(match.group(2))
+                break
+                
+        known_jockeys = ['藤江渉', '福原杏', '沖響主', '山口達', '笠野雄', '濱田達', '山林堂', '加藤雄', '吉留孝', '本橋孝', '古岡勇', '秋元耕', '篠谷葵', '小杉亮', '町田直', '和田譲', '岡村健', '川島正', '野澤憲', '山中悠', '山本大', '木間塚']
+        for line in lines[:30]:
+            for kj in known_jockeys:
+                if kj in line:
+                    jockey = kj
+                    break
+            if jockey != "不明":
+                break
+                
+        time_pattern = re.compile(r'ダ\d+\s+(\d+):(\d+\.\d+)')
+        times = []
+        for line in lines:
+            match = time_pattern.search(line)
+            if match:
+                minutes = int(match.group(1))
+                seconds = float(match.group(2))
+                times.append(minutes * 60 + seconds)
+                
+        if times:
+            latest_time = times[0]
+            time_score = round(100 - (latest_time - 76.0) * 2, 1)
+            time_score = max(60.0, min(98.0, time_score))
+
+        fuku_odds_min = round(max(1.1, tan_odds * 0.25), 1)
+        
+        parsed_entries.append({
+            'maruban': maruban,
+            'jockey': jockey,
+            'kyashitsu': kyashitsu,
+            'tan_odds': tan_odds,
+            'fuku_odds_min': fuku_odds_min,
+            'time_score': time_score,
+            'ninki': ninki
+        })
+        
+    return sorted(parsed_entries, key=lambda x: x['maruban'])
+
+# ----------------------------------------------------
+# 3. メイン処理（変数の初期化位置を修正）
+# ----------------------------------------------------
+entries = [] # エラー防止：最初に空のリストを定義しておく
+
+if pasted_data.strip() and start_analysis:
+    entries = parse_netkeiba_v4(pasted_data)
+    if not entries:
+        st.error("⚠️ パースに失敗しました。コピーしたデータの範囲か、馬番の表記を確認してください。")
+else:
+    if not pasted_data.strip():
+        st.info("💡 左のテキストエリアにデータを貼り付けて「🚀 レース解析を実行」を押してください。現在はデモデータを表示中。")
+    else:
+        st.warning("👈 データを貼り付けたら、左サイドバーの下にある「🚀 レース解析を実行」ボタンを押してください！")
+        
+    # 初期デモデータ
+    entries = [
+        {'maruban': 1,  'ninki': 7,  'tan_odds': 45.5, 'fuku_odds_min': 11.4, 'time_score': 95.6, 'jockey': '篠谷葵',   'kyashitsu': '差し'},
+        {'maruban': 2,  'ninki': 10, 'tan_odds': 168.7,'fuku_odds_min': 42.2, 'time_score': 67.6, 'jockey': '小杉亮',   'kyashitsu': '追い込み'},
+        {'maruban': 3,  'ninki': 8,  'tan_odds': 54.1, 'fuku_odds_min': 13.5, 'time_score': 60.0, 'jockey': '町田直',   'kyashitsu': '差し'},
+        {'maruban': 4,  'ninki': 5,  'tan_odds': 23.0, 'fuku_odds_min': 5.8,  'time_score': 95.2, 'jockey': '和田譲',   'kyashitsu': '差し'},
+        {'maruban': 5,  'ninki': 2,  'tan_odds': 4.0,  'fuku_odds_min': 1.0,  'time_score': 97.6, 'jockey': '岡村健',   'kyashitsu': '追い込み'},
+        {'maruban': 6,  'ninki': 1,  'tan_odds': 1.3,  'fuku_odds_min': 1.1,  'time_score': 97.8, 'jockey': '川島正',   'kyashitsu': '差し'},
+        {'maruban': 7,  'ninki': 11, 'tan_odds': 170.4,'fuku_odds_min': 42.6, 'time_score': 89.8, 'jockey': '野澤憲',   'kyashitsu': '差し'},
+        {'maruban': 8,  'ninki': 4,  'tan_odds': 22.2, 'fuku_odds_min': 5.5,  'time_score': 96.0, 'jockey': '山中悠',   'kyashitsu': '差し'},
+        {'maruban': 9,  'ninki': 6,  'tan_odds': 41.2, 'fuku_odds_min': 10.3, 'time_score': 60.0, 'jockey': '山本大',   'kyashitsu': '差し'},
+        {'maruban': 10, 'ninki': 9,  'tan_odds': 62.0, 'fuku_odds_min': 15.5, 'time_score': 95.2, 'jockey': '木間塚',   'kyashitsu': '追い込み'},
+        {'maruban': 11, 'ninki': 3,  'tan_odds': 10.7, 'fuku_odds_min': 2.7,  'time_score': 94.4, 'jockey': '古岡勇',   'kyashitsu': '追い込み'},
+    ]
+
 # ----------------------------------------------------
 # 4. AIコア解析ロジック & 結果表示
 # ----------------------------------------------------
@@ -32,15 +197,10 @@ if entries:
     sorted_horses = sorted(entries, key=lambda x: x['ninki'])
     total_horses = len(sorted_horses)
 
-    # ====================================================
-    # 🔥 【バルさん専用・軸1頭厳選フィルター】
-    # ====================================================
-    
     # 1列目（軸）：★1番人気のみ（超硬実の軸1頭固定）
-    # ※もし1番人気が不安でタイム最上位を入れたい場合は、下のコメントアウトを解除してください
     first_row = [sorted_horses[0]['maruban']] 
     
-    # 2列目（相手）：人気2位〜5位までの「実力上位陣」にギュッと凝縮（4頭）
+    # 2列目（相手）：人気2位〜5位までにギュッと凝縮（4頭）
     second_row = [h['maruban'] for h in sorted_horses[1:5] if h['jockey'] != '秋元耕成']
     second_row = sorted(list(set(second_row)))
 
@@ -56,14 +216,10 @@ if entries:
             is_selected = False
             reasons = []
             
-            # 相手候補（人気上位）は3列目にも基本スライド配置
             if h['ninki'] <= 5:
                 is_selected = True; reasons.append("上位実力")
-            
-            # 大穴（6人気以下）は、条件を「2つ以上クリア」した爆弾馬だけを厳選
             else:
                 hit_count = 0
-                # 複勝が単勝に対して異常に売れている（厳しめの判定）
                 if h['tan_odds'] >= 20.0 and h['fuku_odds_min'] <= (h['tan_odds'] * 0.22):
                     hit_count += 1; reasons.append("複勝歪み")
                 if h['jockey'] in ana_jockey_master:
@@ -71,7 +227,6 @@ if entries:
                 if h['time_score'] >= 95.0:
                     hit_count += 1; reasons.append("激走タイム")
                 
-                # 2つ以上の好材料、または単勝45倍以下の手頃な穴馬なら採用
                 if hit_count >= 2 or (h['tan_odds'] <= 50.0 and hit_count >= 1):
                     is_selected = True
                 
