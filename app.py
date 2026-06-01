@@ -3,12 +3,12 @@ import streamlit as st
 # 画面の基本設定
 st.set_page_config(page_title="Baru競馬AI Pro", page_icon="🎯", layout="wide")
 
-st.title("🎯 Baru競馬AI Pro 〜研究者レベル進化版〜")
+st.title("🎯 Baru競馬AI Pro 〜研究者レベル最終進化版〜")
 st.write("インサイダーオッズ歪み・穴騎手・秋元フィルター完全統合システム")
 st.markdown("---")
 
 # ----------------------------------------------------
-# 1. データの入力エリア（Streamlitの画面上で調整可能）
+# 1. データの入力エリア（画面側で自由に変更可能）
 # ----------------------------------------------------
 st.sidebar.header("🛠 レース条件設定")
 venue = st.sidebar.selectbox("競馬場", ["船橋", "大井", "川崎", "浦和"])
@@ -18,7 +18,7 @@ race_class = st.sidebar.selectbox("クラス", ["C3", "C2", "C1", "B3", "A2", "�
 st.sidebar.markdown("---")
 st.sidebar.write("💡 実際のオッズや騎手を画面でシミュレーションできます")
 
-# テスト用の出馬表データ（実際の船橋3Rベース＋秋元騎手）
+# セッション状態に出馬表データを格納（実際の船橋3Rベース＋秋元騎手）
 if 'entries' not in st.session_state:
     st.session_state.entries = [
         {'maruban': 11, 'ninki': 1,  'tan_odds': 1.6,  'fuku_odds_min': 1.1, 'time_score': 95.0, 'jockey': '古岡勇樹', 'kyashitsu': '先行'},
@@ -34,11 +34,11 @@ if 'entries' not in st.session_state:
         {'maruban': 3,  'ninki': 11, 'tan_odds': 74.0, 'fuku_odds_min': 7.2, 'time_score': 65.0, 'jockey': '秋元耕成', 'kyashitsu': '差し'},
     ]
 
+entries = st.session_state.entries
+
 # ----------------------------------------------------
 # 2. AIコア解析ロジック
 # ----------------------------------------------------
-entries = st.session_state.entries
-
 # 2-1. 波乱度予測
 front_runners = len([h for h in entries if h['kyashitsu'] in ['逃げ', '先行']])
 odds_1st = [h['tan_odds'] for h in entries if h['ninki'] == 1][0]
@@ -65,11 +65,11 @@ with col1:
         st.success(f"判定: 🟢 ガチガチ本命（スコア: {turbulence_score}点）")
         st.info("💡 戦略: 1番人気を固定し、点数を極限まで絞るか見送り。")
 
-# 2-2. 1列目・2列目・3列目の選定
+# 2-2. 各列の選定ロジック
 sorted_horses = sorted(entries, key=lambda x: x['ninki'])
 total_horses = len(sorted_horses)
 
-# 1列目（軸）
+# 【1列目】
 zone1_pool = sorted_horses[:4]
 horse_1st = [h for h in zone1_pool if h['ninki'] == 1][0]
 remaining_zone1 = [h for h in zone1_pool if h['ninki'] != 1]
@@ -81,12 +81,14 @@ if best_time_horse['jockey'] != '秋元耕成':
 else:
     runner_up = sorted(remaining_zone1, key=lambda x: x['time_score'], reverse=True)[1]
     first_row.append(runner_up['maruban'])
+first_row.sort()
 
-# 2列目（相手）
+# 【2列目】
 zone2_pool = sorted_horses[3:8]
 second_row = [h['maruban'] for h in zone2_pool if h['jockey'] != '秋元耕成']
+second_row.sort()
 
-# 3列目（大穴・紐フィルター）
+# 【3列目】
 zone3_pool = sorted_horses[max(0, total_horses-5):]
 third_row = []
 ana_jockey_master = ['山林堂信', '吉留孝司', '古岡勇樹', '加藤雄真', '藤江渉', '笠野雄大']
@@ -115,9 +117,11 @@ with col2:
             st.code(f"⚠️ 馬番:{h['maruban']:02d} ({h['jockey']}) -> 採用 [{', '.join(reasons)}]")
         else:
             st.text(f"💤 馬番:{h['maruban']:02d} ({h['jockey']}) -> 武器不足で見送り")
+            
+    third_row.sort()
 
 # ----------------------------------------------------
-# 3. フォーメーション組み合わせ生成＆出力
+# 3. フォーメーション組み合わせ生成＆グループ表示（UI最適化）
 # ----------------------------------------------------
 st.markdown("---")
 st.subheader("🎯 【最終出力】Baru式・最適化3連複フォーメーション")
@@ -139,11 +143,18 @@ sorted_tickets = sorted(list(final_tickets))
 
 st.success(f"🔥 重複目を自動排除した【合計購入点数: {len(sorted_tickets)} 点】")
 
-# 買い目をグリッド表示
 if sorted_tickets:
-    cols = st.columns(5)
-    for idx, t in enumerate(sorted_tickets):
-        with cols[idx % 5]:
-            st.info(f"[{idx+1:02d}] {t[0]} - {t[1]} - {t[2]}")
+    # 軸馬ごとにブロックを分けてきれいに並べる
+    for jiku in first_row:
+        st.markdown(f"### 🐴 【{jiku}番 軸】の組み合わせ")
+        
+        # この軸馬が含まれる馬券のみを抽出し、昇順で確定
+        jiku_tickets = [t for t in sorted_tickets if jiku in t]
+        
+        # 1行に4点ずつ、すっきり縦一列の流れを作る
+        cols = st.columns(4)
+        for idx, t in enumerate(jiku_tickets):
+            with cols[idx % 4]:
+                st.code(f"🎟 {t[0]:02d} - {t[1]:02d} - {t[2]:02d}", language="text")
 else:
     st.warning("買い目が生成されませんでした。条件を緩和してください。")
