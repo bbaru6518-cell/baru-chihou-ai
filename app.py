@@ -69,15 +69,40 @@ def parse_netkeiba_complete(raw_text):
                 if lt_match:
                     leg_type = lt_match.group(1)
 
-            # 騎手名の安全抽出
+            # 【バグ修正箇所】騎手抽出ロジックの構文とtry-exceptを100%正確に配置
             jockey = "不明"
-            jockey_match = re.search(r'\b人気\)\s+([^\s\d]+)\s+\d', body)
-            if jockey_match:
-                jockey = jockey_match.group(1)
-            else:
-                # フォールバック処理
-                for line in lines:
-                    if any(x in line for x in ["人気)", "kg"]):
-                        parts = line.split()
-                        if len(parts) >= 3:
-                            jockey = parts
+            try:
+                jockey_match = re.search(r'\b人気\)\s+([^\s\d]+)\s+\d', body)
+                if jockey_match:
+                    jockey = jockey_match.group(1)
+                else:
+                    for line in lines:
+                        if any(x in line for x in ["人気)", "kg"]):
+                            parts = line.split()
+                            if len(parts) >= 3:
+                                jockey = parts[2]
+            except Exception:
+                jockey = "不明"
+
+            past_races = []
+            race_starts = [m.start() for m in re.finditer(r'\b\d{4}\.\d{2}\.\d{2}\s+[^\s]+\s+\d+\b', body)]
+            
+            for idx, start_pos in enumerate(race_starts):
+                try:
+                    end_pos = race_starts[idx+1] if idx+1 < len(race_starts) else len(body)
+                    race_chunk = body[start_pos:end_pos].strip()
+                    race_lines = [rl.strip() for rl in race_chunk.split('\n') if rl.strip()]
+                    
+                    if len(race_lines) < 2:
+                        continue
+                        
+                    head_meta = race_lines[0].split()
+                    if len(head_meta) < 3:
+                        continue
+                    date = head_meta[0]
+                    track_name = head_meta[1]
+                    past_race_num = head_meta[2]
+                    
+                    past_race_name = race_lines[1] if len(race_lines) > 1 else "不明"
+                    
+                    track_info_match = re.
