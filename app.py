@@ -66,7 +66,7 @@ if st.button("レース解析エンジン起動", use_container_width=True):
             "desc": "8歳ベテランだが日経データで『データ上位3頭』『馬場適性』のダブル紐マークを獲得！ 展開が極限まで荒れて前が全滅した時、町田騎手の剛腕で3着に突っ込んでくる超大穴候補として△を打つ。"
         },
         {
-            "num": 5, "mark": "△", "name": "ディセントラライズ", "jockey": "木間塚龍", "sire": "パイロ", "odds": 61.4, "pop": 9, "leg": "追込み（たまに先行）", "ten": "★★★☆☆", "last3f": "★★★★~☆", 
+            "num": 5, "mark": "△", "name": "ディセントラライズ", "jockey": "木間塚龍", "sire": "パイロ", "odds": 61.4, "pop": 9, "leg": "追込み（たまに先行）", "ten": "★★★☆☆", "last3f": "★★★★☆", 
             "nikkei_tags": [],
             "desc": "砂の鬼パイロ産駒。行き脚自体はムラがあるが、前がやり合って崩れればラスト3ハロンのキレを活かして激走する穴馬候補。紐の端に。"
         },
@@ -119,7 +119,8 @@ if st.button("レース解析エンジン起動", use_container_width=True):
     for h in race_horses:
         is_danger = "秋元" in h["jockey"]
         
-        # 危険マークおよび日経競馬紐マークのテキスト生成
+        # 危険騎手だけを赤文字（:red[]）にし、それ以外は普通のテキストで出力
+        jockey_display = f":red[{h['jockey']}]" if is_danger else h["jockey"]
         danger_alert = " 🚨【危険：鞍上秋元マーク・消し推奨】" if is_danger else ""
         
         # 日経競馬データのタグバッジを作成
@@ -128,15 +129,13 @@ if st.button("レース解析エンジン起動", use_container_width=True):
             tags = " / ".join(h["nikkei_tags"])
             tag_html = f" <span style='background-color:#FFF3CD; padding:2px 6px; border-radius:4px; font-weight:bold; color:#856404;'>📊 日経競馬紐候補（{tags}）</span>"
         
-        # 馬頭タイトル（印 ＋ 馬名 ＋ 赤文字騎手）
-        # Streamlitのマークダウンで :red[テキスト] を使うと赤文字になります
-        st.markdown(f"#### 【{h['mark']}】 {h['num']:02d}番 【{h['name']}】 騎手: :red[{h['jockey']}] {danger_alert}")
+        # 馬頭タイトル（印 ＋ 馬名 ＋ 騎手表示）
+        st.markdown(f"#### 【{h['mark']}】 {h['num']:02d}番 【{h['name']}】 騎手: {jockey_display} {danger_alert}")
         if tag_html:
             st.markdown(tag_html, unsafe_allow_html=True)
         
         c1, c2, c3, c4 = st.columns([1.2, 1.6, 1.5, 1.2])
         with c1:
-            # 印に応じた勝率プロットの微調整表示
             win_map = {"◎": "22.5%", "〇": "18.4%", "☆": "10.1%", "△": "8.5%", "消": "1.2%", "　": "3.2%"}
             place_map = {"◎": "68.0%", "〇": "59.2%", "☆": "34.0%", "△": "28.5%", "消": "4.5%", "　": "9.8%"}
             st.markdown(f"**📊 評価勝率**\n* 単勝: `{win_map[h['mark']]}` \n* 複勝: `{place_map[h['mark']]}`")
