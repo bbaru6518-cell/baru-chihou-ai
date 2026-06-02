@@ -4,12 +4,12 @@ import json
 import os
 import re
 
-# =========================================================================
-# 1. パース関数（極限シンプル・安全版）
-# =========================================================================
+# ==========================================
+# 1. パース関数
+# ==========================================
 def parse_netkeiba_complete(raw_text):
     race_info = {
-        "race_num": 0, "race_name": "データ解析エラー", "distance": 1200,
+        "race_num": 0, "race_name": "エラー", "distance": 1200,
         "track_type": "ダ", "direction": "左", "weather": "不明", "condition": "良"
     }
     horses_list = []
@@ -18,7 +18,6 @@ def parse_netkeiba_complete(raw_text):
         return {"race_info": race_info, "horses": horses_list}
 
     try:
-        # レース情報の抽出（短く分割）
         r_pattern = r'(\d+)R\s+([^\n]+)'
         info_match = re.search(r_pattern, raw_text)
         if info_match:
@@ -48,7 +47,6 @@ def parse_netkeiba_complete(raw_text):
                 
             horse_name = lines[0]
             
-            # 体重や人気の抽出
             weight, popularity = 450, 1
             w_match = re.search(r'(\d+)kg', body)
             if w_match:
@@ -57,14 +55,12 @@ def parse_netkeiba_complete(raw_text):
             if p_match:
                 popularity = int(p_match.group(1))
 
-            # 脚質の判定（1行を極めて短く修正してエラー対策）
             leg_type = "不明"
             for lt in ["逃", "先", "差", "追"]:
                 if lt in body:
                     leg_type = lt
                     break
 
-            # 騎手の抽出
             jockey = "不明"
             for line in lines:
                 if "人気)" in line or "kg" in line:
@@ -73,7 +69,6 @@ def parse_netkeiba_complete(raw_text):
                         jockey = parts[2]
                         break
 
-            # 過去走データ処理（クラッシュ防止ガード）
             past_races = []
             horses_list.append({
                 "waku": waku, "uma_ban": uma_ban, "horse_name": horse_name,
@@ -86,12 +81,23 @@ def parse_netkeiba_complete(raw_text):
         
     return {"race_info": race_info, "horses": horses_list}
 
-# =========================================================================
-# 2. Streamlit UI メインロジック
-# =========================================================================
-st.set_page_config(page_title="Baru競馬AI Pro", layout="wide")
+# ==========================================
+# 2. UI表示（文字切れを物理的に防ぐ超短縮行）
+# ==========================================
+st.set_page_config(page_title="Baru競馬AI", layout="wide")
 
-st.title("🎯 Baru競馬AI Pro — 地方競馬・走破理論解析")
-st.caption("netkeibaの出馬表コピペから一撃で完全に構造化し、フォーメーションを自動生成します。")
+st.title("🎯 Baru競馬AI Pro")
+st.caption("netkeibaコピペ解析エンジン")
 
-raw_input = st.text_area("ここにnetkeibaの出馬表テキスト
+# 文字列を限界まで短くして変数化（これで絶対に切れません）
+msg_label = "ここにテキストを貼り付け"
+raw_input = st.text_area(label=msg_label, height=300)
+
+# ボタンの引数もシンプル化
+if st.button("レース解析エンジン起動"):
+    if not raw_input.strip():
+        st.warning("データが空っぽだよ！")
+    else:
+        parsed_data = parse_netkeiba_complete(raw_input)
+        entries = parsed_data["horses"] 
+        race_info = parsed_data
