@@ -3,13 +3,22 @@ from parser import parse_netkeiba_complete
 
 st.set_page_config(page_title="Baru競馬AI Pro", layout="wide")
 
+# セッション状態の初期化（保存された設定を保持する枠）
+if "saved_settings" not in st.session_state:
+    st.session_state.saved_settings = {"api_key": "", "criteria": "", "saved": False}
+
 # ====================================================================
-# 🛠️ サイドバー：総監督司令部（スクリーンショット 2026-06-02 152350.png を完全再現）
+# 🛠️ サイドバー：総監督司令部（保存ボタン追加）
 # ====================================================================
 st.sidebar.markdown("## ⚙️ 総監督司令部")
 
 # Gemini API KEY 入力枠
-gemini_key = st.sidebar.text_input("Gemini API KEY", type="password", help="GeminiのAPIキーを入力してください")
+gemini_key = st.sidebar.text_input(
+    "Gemini API KEY", 
+    value=st.session_state.saved_settings["api_key"],
+    type="password", 
+    help="GeminiのAPIキーを入力してください"
+)
 
 st.sidebar.markdown("---")
 
@@ -23,12 +32,23 @@ default_criteria = (
     "• 上がり3F\n"
     "• 展開・ハナ争い"
 )
+
+# 保存されている値があればそれを使い、なければデフォルトを表示
+current_criteria = st.session_state.saved_settings["criteria"] if st.session_state.saved_settings["criteria"] else default_criteria
+
 analysis_criteria = st.sidebar.text_area(
     label="解析基準プロンプト",
-    value=default_criteria,
+    value=current_criteria,
     height=250,
-    label_visibility="collapsed" # スクショ通りラベルなしでスッキリ表示
+    label_visibility="collapsed"
 )
+
+# 🔥 【新規追加】ここまでの保存ボタン
+if st.sidebar.button("🛠️ 設定を保存・適用する", use_container_width=True):
+    st.session_state.saved_settings["api_key"] = gemini_key
+    st.session_state.saved_settings["criteria"] = analysis_criteria
+    st.session_state.saved_settings["saved"] = True
+    st.sidebar.success("設定を司令部に保存しました！")
 
 st.sidebar.markdown("---")
 
@@ -40,7 +60,7 @@ past_log_selection = st.sidebar.selectbox(
     options=["No options to select"],
     label_visibility="collapsed"
 )
-if st.sidebar.button("📖 予想指示書を呼び出す"):
+if st.sidebar.button("📖 予想指示書を呼び出す", use_container_width=True):
     st.sidebar.info("過去ログ機能は現在準備中です。")
 
 
@@ -48,15 +68,19 @@ if st.sidebar.button("📖 予想指示書を呼び出す"):
 # 🎯 メイン画面：Baru競馬AI Pro 解析エンジン
 # ====================================================================
 st.title("🎯 Baru競馬AI Pro — 地方・中央 走破理論解析")
+
+# 設定が保存されている場合にメイン画面にインジケータを表示
+if st.session_state.saved_settings["saved"]:
+    st.caption("🟢 総監督司令部の解析基準・API設定が適用されています")
+
 raw_input = st.text_area("netkeibaの出馬表をコピペしてください", height=300)
 
 # 解析・フォーメーション計算ボタン
-if st.button("レース解析エンジン起動", width="stretch"):
+if st.button("レース解析エンジン起動", use_container_width=True):
     inp = raw_input.strip()
     if not inp:
         st.warning("データを入力してください。")
     else:
-        # parser.py からデータをパース
         res = parse_netkeiba_complete(inp)
         entries = res["horses"]
         r_info = res["race_info"]
@@ -64,14 +88,12 @@ if st.button("レース解析エンジン起動", width="stretch"):
         if not entries:
             st.error("馬データが見つからない、またはパースに失敗しました。コピペの範囲を確認してください。")
         else:
-            # メイン画面側にパース結果と解析結果を綺麗に並べて表示
             st.markdown("---")
             st.markdown(f"## 📊 レース舞台: {r_info['race_name']}")
             st.info(f"**確定条件:** {r_info['track_type']}{r_info['distance']}m")
             
-            # 【新・メイン側表示】パースされた馬データ一覧を確認用に出力
             st.markdown("### 🐎 出走馬データ（パース結果）")
-            cols = st.columns(2) # 2列でスッキリ表示
+            cols = st.columns(2)
             for idx, h in enumerate(entries):
                 with cols[idx % 2]:
                     with st.expander(f"[{h['waku']}枠] {h['uma_ban']:02d} {h['horse_name']}"):
@@ -82,7 +104,7 @@ if st.button("レース解析エンジン起動", width="stretch"):
             st.markdown("### 🎯 レース解析・フォーメーション結果")
             st.write("**【📊 レース構造解析】** 波乱度: 45点 -> ⚖️ 平穏〜中波乱（良馬場時計勝負）")
             
-            # 軸・相手・穴の自動振り分け logic
+            # 軸・相手・穴の自動振り分け
             jiku, aite, ana = [], [], []
             for h in entries:
                 if h['popularity'] <= 2: 
@@ -107,7 +129,6 @@ if st.button("レース解析エンジン起動", width="stretch"):
             
             st.write(f"**合計購入点数:** {len(tkts)} 点")
             
-            # 買い目をトグルにまとめてスッキリさせる
-            with st.expand_to_see_all_bets("📝 生成された買い目一覧（コピー用）" if hasattr(st, "expand_to_see_all_bets") else st.expander("📝 生成された買い目一覧（コピー用）")):
+            with st.expander("📝 生成された買い目一覧（コピー用）"):
                 for i, t in enumerate(tkts, 1):
                     st.code(f"[{i:02d}] {t[0]}-{t[1]}-{t[2]}")
