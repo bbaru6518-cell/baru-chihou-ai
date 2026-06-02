@@ -16,7 +16,7 @@ st.set_page_config(page_title="Baru地方競馬AI Pro", layout="wide")
 # APIキーの取得
 api_key = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY"))
 if not api_key:
-    st.error("エラー: GEMINI_API_KEY が設定されていません。")
+    st.error("API KEY ERROR")
     st.stop()
 
 # 最新のGenAIクライアント初期化
@@ -97,17 +97,15 @@ def generate_barus_formation(race_df, netkeiba_top3, wave_score):
 # Streamlit UI 画面構築
 # ==============================================================================
 st.title("🎯 Baru地方競馬AI Pro")
-st.subheader("〜 走破タイム理論 × netkeibaデータ分析救済システム 〜")
+st.subheader("〜 走破タイム理論 × netkeibaデータ分析救済 〜")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 📋 1. 出走馬・前日データ入力")
-    race_title = st.text_input("レース名（例: 船橋 3R (C3)）", "船橋 3R (C3)")
-    wave_input = st.slider("波乱度スコア（想定）", 0, 100, 65)
+    st.markdown("### 📋 1. 出走馬データ入力")
+    race_title = st.text_input("レース名", "船橋 3R")
+    wave_input = st.slider("波乱度スコア", 0, 100, 65)
 
-    # ❌ エラーの原因だったトリプルクォーテーションを廃止
-    # ⭕ 1行の安全なテキスト記述に変更（\nで改質を表現）
+    # ⭕ エラーの出たラベル部分を「馬データ」と極限まで短くし、トラブルを防止
     default_text = "11 アイディアル 御神本\n05 ジョーエスポワール 笹川\n10 コスモミツボシ 矢野\n02 シャマル 川田\n09 ウインアザレア 森\n06 濱田達也 濱田\n01 藤江渉 藤江\n08 加藤雄真 加藤\n07 山林堂信 山林堂\n03 秋元耕成 秋元"
-    raw_horse_data = st.text_area(
-        "出走馬
+    raw_horse_
