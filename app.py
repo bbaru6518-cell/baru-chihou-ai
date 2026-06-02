@@ -76,7 +76,11 @@ if st.button("レース解析エンジン起動", use_container_width=True):
             try:
                 # Gemini APIの初期化
                 genai.configure(api_key=st.session_state.api_key)
-                model = genai.GenerativeModel('gemini-1.5-pro')
+                
+                # 🔥 【修正ポイント】1.5から最新の2.5系モデルへ変更
+                # よりディープな走破理論解析をさせたい場合は 'gemini-2.5-pro'
+                # 爆速で結果を返したい場合は 'gemini-2.5-flash' を指定してください
+                model = genai.GenerativeModel('gemini-2.5-pro')
                 
                 # 記憶されたすべてのデータをプロンプトに統合
                 prompt = f"""
