@@ -17,8 +17,14 @@ def parse_netkeiba_complete(raw_text):
     if not raw_text or not raw_text.strip():
         return {"race_info": race_info, "horses": horses_list}
 
+    # 長い正規表現を分割して安全に結合（ちぎれバグ対策）
     try:
-        info_match = re.search(r'(\d+)R\s+([^\n]+)\s+.*?発走\s+/\s+([ダ芝])(\d+)m\s*\((.*?)\)\s+/\s+天候:(.*?)\s+/\s+馬場:(.*)', raw_text)
+        race_regex = (
+            r'(\d+)R\s+([^\n]+)\s+.*?発走\s+/\s+'
+            r'([ダ芝])(\d+)m\s*\((.*?)\)\s+/\s+'
+            r'天候:(.*?)\s+/\s+馬場:(.*)'
+        )
+        info_match = re.search(race_regex, raw_text)
         if info_match:
             race_info["race_num"] = int(info_match.group(1))
             race_info["race_name"] = info_match.group(2).strip()
@@ -47,7 +53,8 @@ def parse_netkeiba_complete(raw_text):
             horse_name = lines[0]
             
             weight, weight_diff, odds, popularity = None, None, 1.0, 1
-            weight_match = re.search(r'(\d+)kg\((.*?)\)\s+([\d.]+)\s+\((\d+)人気\)', body)
+            weight_regex = r'(\d+)kg\((.*?)\)\s+([\d.]+)\s+\((\d+)人気\)'
+            weight_match = re.search(weight_regex, body)
             if weight_match:
                 weight = int(weight_match.group(1))
                 weight_diff = weight_match.group(2)
@@ -60,49 +67,4 @@ def parse_netkeiba_complete(raw_text):
                 kinryo = float(kinryo_match.group(1))
                 
             leg_type = "不明"
-            for lt in ["逃", "先", "差", "追"]:
-                if lt in lines:
-                    leg_type = lt
-                    break
-            if leg_type == "不明":
-                lt_match = re.search(r'\b(逃|先|差|追)\b', body)
-                if lt_match:
-                    leg_type = lt_match.group(1)
-
-            # 【バグ修正箇所】騎手抽出ロジックの構文とtry-exceptを100%正確に配置
-            jockey = "不明"
-            try:
-                jockey_match = re.search(r'\b人気\)\s+([^\s\d]+)\s+\d', body)
-                if jockey_match:
-                    jockey = jockey_match.group(1)
-                else:
-                    for line in lines:
-                        if any(x in line for x in ["人気)", "kg"]):
-                            parts = line.split()
-                            if len(parts) >= 3:
-                                jockey = parts[2]
-            except Exception:
-                jockey = "不明"
-
-            past_races = []
-            race_starts = [m.start() for m in re.finditer(r'\b\d{4}\.\d{2}\.\d{2}\s+[^\s]+\s+\d+\b', body)]
-            
-            for idx, start_pos in enumerate(race_starts):
-                try:
-                    end_pos = race_starts[idx+1] if idx+1 < len(race_starts) else len(body)
-                    race_chunk = body[start_pos:end_pos].strip()
-                    race_lines = [rl.strip() for rl in race_chunk.split('\n') if rl.strip()]
-                    
-                    if len(race_lines) < 2:
-                        continue
-                        
-                    head_meta = race_lines[0].split()
-                    if len(head_meta) < 3:
-                        continue
-                    date = head_meta[0]
-                    track_name = head_meta[1]
-                    past_race_num = head_meta[2]
-                    
-                    past_race_name = race_lines[1] if len(race_lines) > 1 else "不明"
-                    
-                    track_info_match = re.
+            for lt in
