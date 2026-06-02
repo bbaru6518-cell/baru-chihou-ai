@@ -5,6 +5,7 @@ def parse_netkeiba_complete(raw):
     horses = []
     if not raw or not raw.strip(): 
         return {"race_info": info, "horses": horses}
+    
     try:
         m = re.search(r'(\d+)R\s+([^\n]+)', raw)
         if m: 
@@ -17,14 +18,19 @@ def parse_netkeiba_complete(raw):
     except: 
         pass
 
-    blocks = re.split(r'(?:\n|^)(\d+)\s+(\d+)\s*\n?--', raw)[1:]
+    # 枠・馬番の切り出しロジックを限界まで強化（-- が無くても隙間や改行で切り出す）
+    blocks = re.split(r'(?:\n|^)(\d+)\s+(\d+)\s*(?:\n|--|\s)', raw)[1:]
+    
     for i in range(0, len(blocks) - 2, 3):
         try:
-            wk = int(blocks[i])
-            ub = int(blocks[i+1])
+            wk = int(blocks[i].strip())
+            ub = int(blocks[i+1].strip())
             body = blocks[i+2].strip()
             lines = [l.strip() for l in body.split('\n') if l.strip()]
-            if not lines: continue
+            if not lines: 
+                continue
+            
+            horse_name = lines[0]
             
             wt, pop, odds = 450, 1, 5.0
             wm = re.search(r'(\d+)kg', body)
@@ -36,16 +42,21 @@ def parse_netkeiba_complete(raw):
 
             leg = "不明"
             for lt in ["逃", "先", "差", "追"]:
-                if lt in body: leg = lt; break
+                if lt in body: 
+                    leg = lt
+                    break
 
             jk = "不明"
-            jm = re.search(r'人気\)\s+([^\s\d]+)', body)
-            if jm: jk = jm.group(1)
+            jm = re.search(r'(?:人気\)|kg)\s+([^\s\d]+)', body)
+            if jm: 
+                jk = jm.group(1)
             else:
                 for ln in lines:
                     if "人気)" in ln or "kg" in ln:
                         pts = ln.split()
-                        if len(pts) >= 3: jk = pts[2]; break
+                        if len(pts) >= 2:
+                            jk = pts[-1]
+                            break
 
             past = []
             p_regex = r'\b\d{4}\.\d{2}\.\d{2}\s+[^\s]+\s+\d+\b'
@@ -63,11 +74,14 @@ def parse_netkeiba_complete(raw):
                             "date": meta[0], "track": meta[1], "race_num": meta[2], "race_name": r_lns[1],
                             "track_type": ti.group(1), "distance": int(ti.group(2)), "time": ti.group(3), "condition": ti.group(4)
                         })
-                except: continue
+                except: 
+                    continue
 
             horses.append({
-                "waku": wk, "uma_ban": ub, "horse_name": lines[0], "jockey": jk,
+                "waku": wk, "uma_ban": ub, "horse_name": horse_name, "jockey": jk,
                 "kinryo": 54.0, "leg_type": leg, "weight": wt, "odds": odds, "popularity": pop, "past_races": past
             })
-        except: continue
+        except: 
+            continue
+            
     return {"race_info": info, "horses": horses}
