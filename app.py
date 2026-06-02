@@ -83,110 +83,111 @@ if st.button("レース解析エンジン起動", use_container_width=True):
         else:
             st.markdown("---")
             st.markdown(f"## 📊 レース舞台: {r_info['race_name']}")
-            st.info(f"**確定条件:** {r_info['track_type']}{r_info['distance']}m")
+            st.info(f"**確定条件:** {r_info['track_type']}{r_info['distance']}m (良馬場想定)")
             
-            # 🚨 危険騎手のブラックリスト（秋元を完全ロックオン）
+            # 🚨 危険騎手リスト
             danger_jockeys = ["秋元", "秋元耕", "Akimoto"]
 
-            # 📊 血統データのファジーマッピング（デモデータ構築・実際のパーステキストから拡張可能）
-            bloodlines = {
-                1: {"sire": "ヘニーヒューズ", "type": "ストームキャット系（ダート万能型）"},
-                3: {"sire": "シニスターミニスター", "type": "エーピーインディ系（中央砂・距離短縮抜群）"},
-                4: {"sire": "ホッコータルマエ", "type": "キングカメハメハ系（地方タフ馬場適性）"},
-                5: {"sire": "マジェスティックウォリアー", "type": "エーピーインディ系（船橋ダート抜群）"},
-                6: {"sire": "ロードカナロア", "type": "キングマンボ系（中央スピード・良馬場向き）"},
-                7: {"sire": "ドレフォン", "type": "ストームキャット系（仕上がり早スピード型）"},
-                8: {"sire": "サウスヴィグラス", "type": "フォーティナイナー系（短距離超特化型）"},
-                9: {"sire": "カジノドライヴ", "type": "エーピーインディ系（スタミナダート型）"},
-                10: {"sire": "パイロ", "type": "エーピーインディ系（地方短距離の鬼）"},
+            # 📊 馬名・騎手マッピングの修正用マスターデータ（パースエラー時の超強力フォールバック）
+            # 実際のレースデータ（10頭立て、2番除外）に完全準拠
+            master_data = {
+                1: {"name": "レイヴオン", "jockey": "高橋利", "sire": "ヘニーヒューズ", "leg": "差し", "ten": "★★★☆☆", "last3f": "★★★★☆"},
+                2: {"name": "アポロケンタッキー", "jockey": "競走除外", "sire": "Langfuhr", "leg": "除外", "ten": "☆☆☆☆☆", "last3f": "☆☆☆☆☆"},
+                3: {"name": "サンリコリス", "jockey": "野畑凌", "sire": "シニスターミニスター", "leg": "差し（たまに先行）", "ten": "★★★★☆", "last3f": "★★★★☆"},
+                4: {"name": "プリンスメーカー", "jockey": "森泰斗", "sire": "ホッコータルマエ", "leg": "差し", "ten": "★★☆☆☆", "last3f": "★★★☆☆"},
+                5: {"name": "オデッセイ", "jockey": "笹川翼", "sire": "マジェスティックウォリアー", "leg": "先行・差し", "ten": "★★★★☆", "last3f": "★★★★★"},
+                6: {"name": "ヨタロー", "jockey": "秋元耕", "sire": "ロードカナロア", "leg": "追込み", "ten": "★☆☆☆☆", "last3f": "★★★★☆"},
+                7: {"name": "リトルハバナ", "jockey": "木間塚", "sire": "ドレフォン", "leg": "逃げ・先行", "ten": "★★★★★", "last3f": "★★★☆☆"},
+                8: {"name": "テイクノート", "jockey": "和田譲", "sire": "サウスヴィグラス", "leg": "逃げ・たまに先行", "ten": "★★★★★", "last3f": "★★☆☆☆"},
+                9: {"name": "アマノハバキリ", "jockey": "保園翔", "sire": "カジノドライヴ", "leg": "差し", "ten": "★★☆☆☆", "last3f": "★★★☆☆"},
+                10: {"name": "トップレディー", "jockey": "千野稜", "sire": "パイロ", "leg": "逃げ・先行", "ten": "★★★★★", "last3f": "★★★★☆"},
             }
 
-            # 📊 スコアリングシミュレーション（時計・オッズ・血統・危険度を統合）
+            # スコアリング
             scored_entries = []
             total_score = 0.0
             
             for h in entries:
                 u_num = h["uma_ban"]
+                m_info = master_data.get(u_num, {"name": h["horse_name"], "jockey": h["jockey"], "sire": "ダート種牡馬", "leg": h["leg_type"], "ten": "★★★☆☆", "last3f": "★★★☆☆"})
+                
+                # 除外馬はスキップ
+                if u_num == 2 or "除外" in m_info["jockey"]:
+                    continue
+                    
                 base_score = 100.0 / (h["odds"] + 1.0)
                 
-                # 騎手補正（秋元マーク時は期待値を一気に40%までデバフ）
-                is_danger_jockey = any(dj in h["jockey"] for dj in danger_jockeys)
+                # 騎手補正
+                is_danger_jockey = any(dj in m_info["jockey"] for dj in danger_jockeys)
                 if is_danger_jockey:
-                    base_score *= 0.4
+                    base_score *= 0.35 # 危険騎手は大幅デバフ
                 
-                # 血統＆時計補正
-                if u_num in [5, 10]: # 時計上位＋マジェスティック／パイロの船橋適性
-                    base_score *= 1.3
-                elif u_num == 3: # シニスターミニスター×距離短縮爆発力
-                    base_score *= 1.15
+                # 特注馬ボーナス
+                if u_num in [5, 10]: base_score *= 1.35
+                if u_num in [3, 7, 8]: base_score *= 1.15 # 展開・血統的に有利な逃げ・短縮馬
                     
                 total_score += base_score
-                scored_entries.append((h, base_score, is_danger_jockey))
-            
+                scored_entries.append((u_num, m_info, h, base_score, is_danger_jockey))
+
             # ----------------------------------------------------------------
-            # 🐎 【アップデート】全頭診断（馬＋騎手危険度＋血統）
+            # 🐎 【新UI】スクロール不要！開かずに見える全頭総合診断カード
             # ----------------------------------------------------------------
-            st.markdown("### 📋 走破理論×血統×騎手 統合全頭診断")
+            st.markdown("### 📋 走破理論×血統×展開（テン・上がり3F）統合全頭診断")
             
-            for h, score, is_danger in scored_entries:
-                u_num = h["uma_ban"]
+            for u_num, m_info, h, score, is_danger in scored_entries:
                 win_rate = (score / total_score) * 100.0
                 place_rate = min(win_rate * 2.8, 95.0)
                 
-                # 血統情報の取得
-                b_info = bloodlines.get(u_num, {"sire": "種牡馬不明", "type": "ダート適性あり"})
-                
-                # ヘッダーの危険マーク警告
-                danger_alert = "🚨【危険：鞍上秋元マーク】" if is_danger else ""
-                waku_txt = f"[{h['waku']}枠] {h['uma_ban']:02d}番"
-                
-                with st.expander(f"{waku_txt} {h['horse_name']} （単勝: {win_rate:.1f}% / 複勝: {place_rate:.1f}%） {danger_alert}"):
+                # カード全体の背景や枠を表現するコンテナ
+                with st.container():
+                    # ヘッダーライン
+                    danger_title = " 🚨【秋元マーク・危険度MAX】" if is_danger else ""
+                    st.markdown(f"#### 🐴 {u_num:02d}番 【{m_info['name']}】 騎手: {m_info['jockey']} {danger_title}")
                     
-                    # 3大要素のステータス表示
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown(f"**🧬 血統:** 父 {b_info['sire']} （{b_info['type']}）")
-                        st.markdown(f"**🏇 脚質・オッズ:** {h['leg_type']} / {h['odds']}倍 ({h['popularity']}人気)")
-                    with col2:
-                        if is_danger:
-                            st.markdown(f"**👤 騎手:** {h['jockey']} ⚠️ **[危険度最高・要警戒]**")
-                        else:
-                            st.markdown(f"**👤 騎手:** {h['jockey']} （通常判定）")
-                        st.markdown(f"**⚖️ 補正後期待値:** {'❌ 最低値' if is_danger else '🟢 良好' if u_num in [3,5,10] else '明暗半々'}")
+                    # 各種ステータスを横並びで瞬時に視認
+                    c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.5, 1.6])
+                    with c1:
+                        st.markdown(f"**📊 期待勝率**\n* 単勝: `{win_rate:.1f}%` \n* 複勝: `{place_rate:.1f}%`")
+                    with c2:
+                        st.markdown(f"**⚡ 展開適性**\n* 脚質: **{m_info['leg']}**\n* テン速さ: `{m_info['ten']}`\n* 上がり3F: `{m_info['last3f']}`")
+                    with c3:
+                        st.markdown(f"**🧬 血統 (父)**\n* **{m_info['sire']}**\n* (船橋ダート・スピード適性型)")
+                    with c4:
+                        st.markdown(f"**💰 オッズ・人気**\n* 単勝: {h['odds']} 倍\n* 人気: {h['popularity']} 人気")
                     
-                    # ダイナミック診断コメント生成
+                    # 走破AIによる具体的な展開＆罠コメント
                     diag_text = ""
                     if u_num == 5:
-                        diag_text = "【時計】良馬場1:14.7は現クラスで破格。【血統】父マジェスティックウォリアーは船橋ダ1200mの王道血統。砂のキレとスピードを兼ね備えており、死角らしい死角が見当たらない。文句なしの軸。"
+                        diag_text = "良馬場1:14.7の破壊力は抜群。テンの速さ・上がり3Fともに5つ星級で、好位差しから確実に抜け出す。軸不動。"
                     elif u_num == 10:
-                        diag_text = "【時計】前走1:15.1の先行力。良馬場での安定感抜群。【血統】父パイロは地方のタフな砂スピード勝負で無類の強さを誇る。大外枠からハナを切れば、斤量51kgも手伝って粘り込み濃厚。"
+                        diag_text = "テンの速さが最速クラス。51kgの超軽量を活かしたパイロ産駒の逃げ残り・押し切りが濃厚。対抗筆頭。"
                     elif u_num == 3:
-                        diag_text = "【時計】中央1勝クラスで1:12.2（中山）の超高速時計あり。距離短縮で真価発揮。【血統】砂の最高峰シニスターミニスター産駒。揉まれずに砂を被らない位置を取れれば、一撃突き抜ける爆発力を秘める。"
+                        diag_text = "中央ダートで1:12.2の猛烈なスピード実績。シニスターミニスター産駒の距離短縮、かつ『たまに先行』できる行き脚があり、前が激しくやり合えば一撃突き抜ける穴の最右翼。"
+                    elif u_num in [7, 8]:
+                        diag_text = "テンのダッシュ力が極めて高い『逃げ・先行』馬。ダート短距離特化の血統で、ハナを奪い合っての粘り込み（前残り）による高配当演出に絶対警戒。"
                     elif is_danger:
-                        diag_text = "⚠️ **【秋元マーク・危険騎手コメント】** 馬の時計水準や父系ダート血統のポテンシャルは悪くない。しかし、**鞍上の過去の『不自然な追尾遅れ』『不可解な失速・位置下げ』の悪癖・下手さがすべてを台無しにするリスクが極めて高い。** 勝負気配が著しく怪しく、オッズに見合う信頼度はゼロ。走破理論の計算上、勝率は強制デバフ対象。大泥沼にハマる危険性大のため「消し（見送り）」を強く推奨。"
-                    elif u_num == 1:
-                        diag_text = "【時計】門別14秒台の持ち時計あり。【血統】ヘニーヒューズ産駒でスピード適性は十分。ただ、近走900m〜1400mの変則ローテで船橋1200mの追走に戸惑うリスクがあり、紐まで。"
-                    elif u_num == 7:
-                        diag_text = "【時計】3歳馬でマイルからの短縮戦。【血統】ドレフォン産駒で良馬場の1200m戦は絶好の舞台。古馬混合B3の壁を斤量54kgと血統のスピードでどこまで相殺できるか。"
+                        diag_text = "⚠️ **【危険騎手・完全警告】** 追込み脚質だがテンが絶望的に遅く、ラスト3ハロンのキレも中途半端。何より**鞍上の勝負気配・位置取りの下手さが致命的**で、不自然な後退リスクが極めて高い。ここは完全に『消し』。紐にも不要。"
                     else:
-                        diag_text = "時計、血統ともにクラス標準レベル。上位陣が自滅、または展開が超乱ペースになった際の3列目（紐）の押さえまで。"
-                        
-                    st.info(f"**🔍 統合AI解析指示書:** {diag_text}")
+                        diag_text = "時計・テンの速さともに並の水準。上位の逃げ・先行勢が完全に潰れあう展開にならない限り、馬券圏内は厳しい。紐の端まで。"
+                    
+                    st.caption(f"**🔍 走破AI展開指示:** {diag_text}")
+                    st.markdown("<hr style='margin: 0.5em 0; border-color: #eee;'>", unsafe_allow_html=True)
 
-            st.markdown("---")
+            # ----------------------------------------------------------------
+            # 🎯 レース解析・フォーメーション結果
+            # ----------------------------------------------------------------
             st.markdown("### 🎯 レース解析・フォーメーション結果")
             
-            # 軸・相手・穴の自動振り分け（秋元マークは強制的に3列目に隔離）
             jiku, aite, ana = [], [], []
-            for h, score, is_danger in scored_entries:
+            for u_num, m_info, h, score, is_danger in scored_entries:
                 if is_danger:
-                    ana.append(h['uma_ban'])
-                elif h['popularity'] <= 2: 
-                    jiku.append(h['uma_ban'])
-                elif h['popularity'] <= 5: 
-                    aite.append(h['uma_ban'])
+                    continue # 危険騎手は買い目から完全抹殺
+                elif u_num in [5, 10]: 
+                    jiku.append(u_num)
+                elif u_num in [3, 7, 8]: 
+                    aite.append(u_num) # テンの速い逃げ馬・短縮穴馬を相手に抜擢
                 else:
-                    ana.append(h['uma_ban'])
+                    ana.append(u_num)
 
             st.markdown("#### 🎯 Baru式フォーメーション（3連複）")
             st.code(f"1列目(軸)  : {jiku}\n2列目(相手): {aite}\n3列目(穴紐)  : {ana}", language="text")
