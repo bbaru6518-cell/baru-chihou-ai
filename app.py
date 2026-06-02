@@ -1,121 +1,90 @@
-import streamlit as st
-import google.generativeai as genai
+import pandas as pd
 
-st.set_page_config(page_title="Baru競馬AI Pro", layout="wide")
 
-# ====================================================================
-# 💾 全自動記憶システム（セッション状態の初期化）
-# ====================================================================
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
-if "analysis_criteria" not in st.session_state:
-    st.session_state.analysis_criteria = (
-        "• JRA/地方競馬の高速馬場・トラックバイアス・砂厚の補正\n"
-        "• 走破タイム理論（基準タイム・馬場補正・ハイペース/スロー展開予測）\n"
-        "• 上がり3Fのキレとスタミナ持続力\n"
-        "• netkeibaデータ分析（コース・距離・馬場・間隔）の完全システム連動"
-    )
-if "review_input" not in st.session_state:
-    st.session_state.review_input = (
-        "【🔥 バル式・4大特化データ強制ハメ込み黄金律】\n"
-        "1.『このコースが得意な馬』 2.『この距離が得意な馬』\n"
-        "3.『この競馬場が得意な馬』 4.『今回の馬場状態が得意な馬』\n\n"
-        "【🚨 1番人気データ圏外の危険シグナル検知】\n"
-        "・単勝1番人気が、上記の4大特化データ（上位3頭）に1つもランクインしていない場合は【極めて危険な過剰人気馬】と判定せよ。\n\n"
-        "【⚠️ レース間隔の鉄の掟】\n"
-        "・『今回のレース間隔で実績がある馬』に名前がある馬は、人気に関わらず必ず【軸】または【紐（相手）】に100%組み込むこと。\n\n"
-        "【💣 ★超重要：地方・高知爆穴救出ロジック】\n"
-        "・船橋、川崎、大井、および高知ファイナルレース等では、最下位人気馬の激走確率が跳ね上がるため、出走馬の中から【下位人気から数えて3頭】を自動で割り出し、3連複フォーメーションの【3列目（紐）】に必ず強制的に全頭組み込むこと！"
-    )
-if "raw_input" not in st.session_state:
-    st.session_state.raw_input = ""
+def generate_barus_formation(race_data, data_analysis_top3):
+    """バル式・データ分析救済型フォーメーション生成ロジック
 
-# ====================================================================
-# 🛠️ サイドバー：総監督司令部
-# ====================================================================
-st.sidebar.markdown("## ⚙️ 総監督司令部")
-st.session_state.api_key = st.sidebar.text_input("Gemini API KEY", value=st.session_state.api_key, type="password")
+    Args:
+        race_data (pd.DataFrame): 馬番、馬名、AIスコア、脚質などのデータ
+        data_analysis_top3 (list): netkeibaデータ分析画面の上位3頭の馬番
+    """
+    print("=== バル式・走破AI 馬券構築システム ===")
+    print(f"【netkeibaデータ分析上位馬】: {data_analysis_top3}\n")
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🎯 統合解析基準（常時適用）")
-st.session_state.analysis_criteria = st.sidebar.text_area("解析基準プロンプト", value=st.session_state.analysis_criteria, height=120)
+    # 1. AIスコア順にソート
+    df_sorted = race_data.sort_values(by="ai_score", ascending=False).copy()
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔍 バル式・最強必勝黄金律（強制記憶）")
-st.session_state.review_input = st.sidebar.text_area("過去レースからの教訓・絶対条件", value=st.session_state.review_input, height=250)
+    # 2. 基本的な軸・相手・ヒモの選定（走破タイムAIのスコアベース）
+    # スコア上位2頭を「軸候補」
+    jiku_candidates = df_sorted.iloc[0:2]["uma_ban"].tolist()
+    # スコア3〜4番手を「相手候補」
+    aite_candidates = df_sorted.iloc[2:4]["uma_ban"].tolist()
+    # スコア5〜9番手を「ヒモ候補」
+    himo_candidates = df_sorted.iloc[4:9]["uma_ban"].tolist()
 
-if st.sidebar.button("🛠️ 設定と必勝データを強制保存", use_container_width=True):
-    st.sidebar.success("色彩装飾＆脚質パース機能をAIに完全同期しました！")
+    print(f" [AI初期診断] 軸: {jiku_candidates}, 相手: {aite_candidates}, ヒモ: {himo_candidates}")
 
-# ====================================================================
-# 🎯 メイン画面：Baru競馬AI Pro 解析エンジン
-# ====================================================================
-st.title("🎯 Baru競馬AI Pro — カラー視覚特化・完全復活版")
-st.markdown("##### ※netkeibaの出馬表から、下の『データ分析』の項目まで丸ごとコピーして貼り付けてください。")
+    # 3. 🔥【今回の教訓ロジック】データ分析上位馬の強制救済
+    saved_horses = []
+    all_selected = set(jiku_candidates + aite_candidates + himo_candidates)
 
-st.session_state.raw_input = st.text_area(
-    "出馬表 ＋ 特化データ分析をここにペースト", 
-    value=st.session_state.raw_input,
-    height=250,
-    placeholder="出馬表データを貼り付けると、AIが自動で人気順・騎手・オッズ・脚質を識別し、カラー色分けされた診断画面を出力します。"
-)
+    for uma in data_analysis_top3:
+        if uma not in all_selected:
+            # どこにも選ばれていない場合、強制的にヒモ（3列目）に追加
+            himo_candidates.append(uma)
+            saved_horses.append(uma)
 
-if st.button("レース解析エンジン起動", use_container_width=True):
-    if not st.session_state.api_key:
-        st.error("❌ 総監督司令部に Gemini API KEY を入力してください！")
-    elif not st.session_state.raw_input:
-        st.warning("⚠️ データが空っぽです。データを貼り付けてください。")
+    if saved_horses:
+        print(f" ⚠️【データ救済発動】分析上位馬 {saved_horses} をヒモに強制追加しました。")
     else:
-        with st.spinner("🧠 カラーレンダリング適用中... 脚質・騎手・オッズを鮮やかに色分けしています..."):
-            try:
-                genai.configure(api_key=st.session_state.api_key)
-                model = genai.GenerativeModel('gemini-2.5-pro')
-                
-                prompt = f"""
-あなたは競馬予想のプロフェッショナルAI「Baru競馬AI Pro」の解析エンジンです。
-バルさんが提供した【コピペデータ】から、人気、オッズ、騎手、そして【脚質（逃・先・差・追）】を正確に読み取り、以下の【超美麗・カラーHTML出力フォーマット】を絶対に崩さずに最後まで出力してください。
+        print(" ✨ データ分析上位馬はすべてAI推奨馬に含まれています。")
 
-【統合解析基準】
-{st.session_state.analysis_criteria}
+    # 4. 最終的なフォーメーションの出力
+    print("\n=== 最終推奨フォーメーション（3連複/3連単） ===")
+    print(f" 1列目（軸）  : {jiku_candidates}")
+    print(f" 2列目（相手）: {aite_candidates}")
+    print(f" 3列目（ヒモ）: {himo_candidates}")
 
-【超重要！バル式・データ必勝黄金律（絶対に破ってはならない掟）】
-{st.session_state.review_input}
 
-【バルさんが提供したコピペデータ（出馬表＋データ分析情報）】
-{st.session_state.raw_input}
+# ==========================================
+# 船橋7Rを模したテストデータでの実行
+# ==========================================
+if __name__ == "__main__":
+    # 模擬出走馬データ（AIスコアは走破タイム理論に基づく算出値と仮定）
+    # 12番ゼンダンクラージュは近走不振でAIスコアが低かった状態を再現
+    data = {
+        "uma_ban": [1, 4, 7, 8, 9, 10, 11, 12, 13, 14],
+        "uma_name": [
+            "ウインアザレア",
+            "リュウノアスリート",
+            "サンタアナウインド",
+            "シンキングファーザ",
+            "ジョーエスポワール",
+            "コスモミツボシ",
+            "アイディアル",
+            "ゼンダンクラージュ",
+            "リアルガチ",
+            "ヴィクトリーロワ",
+        ],
+        "ai_score": [
+            65.2,
+            58.0,
+            78.5,
+            82.1,
+            61.4,
+            72.0,
+            55.3,
+            42.1,
+            80.3,
+            59.8,
+        ],  # 12番は下位
+    }
 
----
-【出力フォーマット・構造指示（Markdown内でのHTML装飾を徹底すること）】
+    race_df = pd.DataFrame(data)
 
-### 🚨 【バル式・危険馬判定】
-- 対象の1番人気馬がデータ上位にいるか検証し、結果を報告してください。
+    # スクリーンショット 2026-06-02 175349.png にあった「データ上位3頭」の馬番を入力
+    # ※ 船橋7Rの画面より：1番、10番、12番
+    netkeiba_top3 = [1, 10, 12]
 
-### 📋 【バル式・全頭診断（カラー視覚特化版）】
-出走するすべての馬（1番から最終頭数まで）について、以下のHTML装飾ルールを完全に適用して1頭ずつすべて書き下してください。
-
-【🎨 カラー装飾・脚質表記ルール】
-1. 各馬のタイトルは「### **X番 [馬名] 【[脚質]】**」とし、コピペデータから読み取った脚質（逃・先・差・追）を必ず入れること。
-2. 人気・単勝オッズは、目立つように赤文字 `<span style="color:#ff3333; font-weight:bold;">〇人気 / 単勝〇.〇倍</span>` で表記すること。
-3. 騎手名は、青文字 `<span style="color:#1e90ff; font-weight:bold;">[騎手名]</span>` で表記すること。
-4. 特記すべき【秋元】騎手、または激走確率の極めて高いバル式爆穴ロジックに該当する下位3頭には、タイトルのすぐ下に `<div style="background-color:#ffe4e1; border-left:5px solid #ff3333; padding:10px; font-weight:bold; color:#ff3333;">🚨バル式・超警戒爆穴ハメ込み馬（紐固定）🚨</div>` という目立つカラーボックスを必ず出力すること。
-
-【馬ごとの出力テンプレート】
-### **X番 [馬名] 【[脚質]】**
-- **ステータス:** <span style="color:#ff3333; font-weight:bold;">〇人気 / 単勝〇.〇倍</span> ／ 騎手: <span style="color:#1e90ff; font-weight:bold;">[騎手名]</span>
-- **該当データ:** [該当する特化データを記載]
-- **理論的見解:** [走破タイム・展開・馬場バイアスからの見解を詳細に]
-
-### 🎯 【バル式・最終フォーメーション】
-- 「レース間隔で実績がある馬」および「最下位人気から3頭の爆穴馬」を100%完全にハメ込んだ【3連複フォーメーション】の買い目を正確に提示してください。
-"""
-
-                response = model.generate_content(prompt)
-                
-                st.markdown("---")
-                st.success("📊 バル式・カラー色分け＆脚質表記の完全復活版解析が完了しました！")
-                
-                # HTMLタグをStreamlit上で正常に色付け表示させるために unsafe_allow_html=True を使用
-                st.markdown(response.text, unsafe_allow_html=True)
-                
-            except Exception as e:
-                st.error(f"解析中にエラーが発生しました: {e}")
+    # フォーメーション生成
+    generate_barus_formation(race_df, netkeiba_top3)
