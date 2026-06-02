@@ -2,37 +2,56 @@ import streamlit as st
 
 st.set_page_config(page_title="Baru競馬AI Pro", layout="wide")
 
-# セッション状態の初期化
-if "saved_settings" not in st.session_state:
-    st.session_state.saved_settings = {"api_key": "", "criteria": "", "saved": False}
+# ====================================================================
+# 💾 全自動記憶システム（セッション状態の初期化）
+# ====================================================================
+if "api_key" not in st.session_state:
+    st.session_state.api_key = ""
+if "analysis_criteria" not in st.session_state:
+    st.session_state.analysis_criteria = (
+        "• JRA/地方競馬の高速馬場・トラックバイアス\n"
+        "• 芝・ダートのキレ\n"
+        "• 走破タイム理論（基準タイム・馬場補正）\n"
+        "• 上がり3F\n"
+        "• 展開・ハナ争い"
+    )
+if "review_input" not in st.session_state:
+    st.session_state.review_input = ""
+if "raw_input" not in st.session_state:
+    st.session_state.raw_input = ""
 
 # ====================================================================
-# 🛠️ サイドバー：総監督司令部
+# 🛠️ サイドバー：総監督司令部（自動記憶対応）
 # ====================================================================
 st.sidebar.markdown("## ⚙️ 総監督司令部")
-gemini_key = st.sidebar.text_input(
+
+# APIキー（変更されたら即座に自動記憶）
+st.session_state.api_key = st.sidebar.text_input(
     "Gemini API KEY", 
-    value=st.session_state.saved_settings["api_key"],
+    value=st.session_state.api_key,
     type="password"
 )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🎯 統合解析基準（常時適用）")
-default_criteria = (
-    "• JRA/地方競馬の高速馬場・トラックバイアス\n"
-    "• 芝・ダートのキレ\n"
-    "• 走破タイム理論（基準タイム・馬場補正）\n"
-    "• 上がり3F\n"
-    "• 展開・ハナ争い"
+st.session_state.analysis_criteria = st.sidebar.text_area(
+    "解析基準プロンプト", 
+    value=st.session_state.analysis_criteria, 
+    height=120
 )
-current_criteria = st.session_state.saved_settings["criteria"] if st.session_state.saved_settings["criteria"] else default_criteria
-analysis_criteria = st.sidebar.text_area("解析基準プロンプト", value=current_criteria, height=150)
 
-if st.sidebar.button("🛠️ 設定を保存・適用する", use_container_width=True):
-    st.session_state.saved_settings["api_key"] = gemini_key
-    st.session_state.saved_settings["criteria"] = analysis_criteria
-    st.session_state.saved_settings["saved"] = True
-    st.sidebar.success("設定を司令部に保存しました！")
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🔍 過去レース復習解析（復活）")
+# 復習用データ（入力されたら即座に自動記憶）
+st.session_state.review_input = st.sidebar.text_area(
+    "復習用の過去レース結果・パドック等のメモ",
+    value=st.session_state.review_input,
+    height=150,
+    placeholder="過去のタイムや、前走の不利などのメモをここに記憶させます"
+)
+
+if st.sidebar.button("🛠️ 設定と復習データを強制保存", use_container_width=True):
+    st.sidebar.success("すべてのデータを記憶しました！")
 
 
 # ====================================================================
@@ -40,10 +59,15 @@ if st.sidebar.button("🛠️ 設定を保存・適用する", use_container_wid
 # ====================================================================
 st.title("🎯 Baru競馬AI Pro — 地方・中央 走破理論解析")
 
-raw_input = st.text_area("netkeibaの出馬表をコピペしてください", height=200)
+# 出馬表コピペ枠（自動記憶対応）
+st.session_state.raw_input = st.text_area(
+    "netkeibaの出馬表をコピペしてください", 
+    value=st.session_state.raw_input,
+    height=180
+)
 
 if st.button("レース解析エンジン起動", use_container_width=True):
-    # リアルデータと日経競馬データを完全融合させたマッピングデータ
+    # データ連動用マッピング（日経競馬データ完全内包）
     race_horses = [
         {
             "num": 1, "mark": "　", "name": "ダイゴホマレリュウ", "jockey": "藤江渉", "sire": "デクラレーションオブウォー", "odds": 12.7, "pop": 6, "leg": "差し", "ten": "★★★☆☆", "last3f": "★★★☆☆", 
@@ -109,27 +133,30 @@ if st.button("レース解析エンジン起動", use_container_width=True):
 
     st.markdown("---")
     st.markdown("## 📊 レース舞台: 船橋10R 馬い!卵はサンサンエッグ(C1)")
+    
+    # サイドバーの復習データが入力されている場合、上部に「復習メモ連携中」と表示
+    if st.session_state.review_input:
+        st.caption(f"ℹ️ **総監督司令部からの復習・メモデータを展開中:** {st.session_state.review_input[:30]}...")
+
     st.info("**確定条件:** ダート1500m (左) / 天候:晴 / 馬場:良 (逃げ・先行有利だが秋元失速で大波乱想定)")
     
     # ----------------------------------------------------------------
-    # 🐎 全頭診断カード（完全フラット・露出仕様）
+    # 🐎 全頭診断カード（露出仕様）
     # ----------------------------------------------------------------
     st.markdown("### 📋 走破理論×血統×日経データ 統合全頭診断")
     
     for h in race_horses:
         is_danger = "秋元" in h["jockey"]
         
-        # 危険騎手だけを赤文字（:red[]）にし、それ以外は普通のテキストで出力
+        # 危険騎手だけをピンポイントで赤文字化
         jockey_display = f":red[{h['jockey']}]" if is_danger else h["jockey"]
         danger_alert = " 🚨【危険：鞍上秋元マーク・消し推奨】" if is_danger else ""
         
-        # 日経競馬データのタグバッジを作成
         tag_html = ""
         if h["nikkei_tags"]:
             tags = " / ".join(h["nikkei_tags"])
             tag_html = f" <span style='background-color:#FFF3CD; padding:2px 6px; border-radius:4px; font-weight:bold; color:#856404;'>📊 日経競馬紐候補（{tags}）</span>"
         
-        # 馬頭タイトル（印 ＋ 馬名 ＋ 騎手表示）
         st.markdown(f"#### 【{h['mark']}】 {h['num']:02d}番 【{h['name']}】 騎手: {jockey_display} {danger_alert}")
         if tag_html:
             st.markdown(tag_html, unsafe_allow_html=True)
@@ -154,15 +181,13 @@ if st.button("レース解析エンジン起動", use_container_width=True):
     # ----------------------------------------------------------------
     st.markdown("### 🎯 レース解析・フォーメーション結果（荒れる地方競馬Ver.）")
     
-    # 軸・相手・穴紐の選定
     jiku = [7]      # ◎ オルペウス
     aite = [8, 11]   # 〇 マルターズヴェロス、☆ レーヌバンケット（爆穴）
-    ana = [12, 4, 9, 5]  # △ 日経トリプル合致のシトロン、ダブル合致のハクサン、およびエクメディ、パイロ
+    ana = [12, 4, 9, 5]  # △ シトロン、ハクサン、エクメディ、パイロ
     
     st.markdown("#### 🎯 Baru式・荒波フォーメーション（3連複）")
     st.code(f"1列目(軸◎)   : {jiku}\n2列目(対抗〇☆): {aite}\n3列目(紐候補△): {ana}", language="text")
     
-    # 点数計算
     tkts = []
     for h1 in jiku:
         for h2 in aite:
