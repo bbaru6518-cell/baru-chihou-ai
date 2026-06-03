@@ -7,6 +7,9 @@ import requests
 from bs4 import BeautifulSoup
 import datetime
 
+# ページの設定（2カラムを綺麗に表示するためにワイドモードに設定）
+st.set_page_config(layout="wide")
+
 # ==============================================================================
 # 1. 精密診断Markdownテーブル生成関数
 # ==============================================================================
@@ -16,7 +19,7 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
     スクリーンショットのデザイン・列構成（父・母・脚質・人気・評価・理由）を完全再現する関数
     """
     if ai_recommendations is None:
-        # デフォルトのサンプルデータ（本番データが空の時の安全弁）
+        # スクリーショトに記載されている実際の馬と解析データのモック
         ai_recommendations = {
             1: {"mother": "パワフルラリマー", "sand": "速砂〇", "style": "先行 📢", "pop": "2", "eval": "〇", "reason": "2走前に同条件(不良)を先行策で圧勝。最内枠から再現可能。"},
             2: {"mother": "デコラス", "sand": "標準", "style": "追込", "pop": "12", "eval": "消", "reason": "追い込み一手で展開利見込めず。近走内容も平凡。"},
@@ -25,9 +28,9 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
             5: {"mother": "アドマイヤジョイ", "sand": "標準", "style": "差し", "pop": "7", "eval": "消", "reason": "C3クラスで頭打ち。強調材料に欠ける。"},
         }
 
-    # スクリーンショットのヘッダーデザインを完全復元
+    # スクリーンショット1枚目のヘッダーデザインを完全復元
     markdown_lines = [
-        "## 📊 全頭精密診断・地方ダート適性リスト\n",
+        "### 📊 全頭精密診断・地方ダート適性リスト\n",
         "| 馬番 | 馬名 | 父 | 母 | ダート砂適性 | 脚質 | 人気 | 評価 | 理由 |",
         "| :---: | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :--- |"
     ]
@@ -57,7 +60,6 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
                 horse_name = lines[1] if len(lines) > 1 else "解析エラー"
                 father = "--"
 
-            # AI推奨データマップから安全にルックアップ
             rec = ai_recommendations.get(num, {
                 "mother": "--", 
                 "sand": "標準", 
@@ -77,40 +79,64 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
 
 
 # ==============================================================================
-# 2. ⚙️ Streamlit UI 配置 ＆ メイン処理
+# 2. ⚙️ Streamlit UI 配置 (スクショ2枚目のレイアウト完全再現)
 # ==============================================================================
 
-# タイトル設定
-st.title("🎯 Baru競馬AI Pro")
-
-# --- 2-A. 左側のサイドバー設定 ---
+# --- 2-A. 左側サイドバー（過去ログ・結果復習ルーム） ---
 with st.sidebar:
-    st.header("📋 レースデータ入力")
-    
-    # ユーザーからの入力を受け取るエリア
-    copypaste_input = st.text_area(
-        "netkeiba等の馬柱データを貼り付けてください", 
-        key="copypaste_input", 
-        height=300
+    st.button("💾 設定保存")
+    st.write("")
+    st.header("📂 過去ログ・結果復習ルーム")
+    st.caption("復習・確認する過去の予想")
+    st.selectbox(
+        "選択してください",
+        ["ファイナルレース(C3)_2026-05-25", "大井11R_東京ダービー"],
+        label_visibility="collapsed"
     )
+    st.button("📖 予想指示書を呼び出す")
     
-    st.info("データを貼り付けると、右側のメイン画面に自動で精密診断テーブルが生成されます。")
+    st.write("---")
+    st.header("🏁 レース結果のコピペ投入")
+    st.caption("💡 1行目にレース名を入力し、2行目から結果を丸ごとコピペしてください！")
+    st.text_area(
+        "1行目：レース名／2行目〜：結果コピペ",
+        value="3コーナー...\n4コーナー...",
+        height=150,
+        label_visibility="collapsed"
+    )
+    st.caption("コーナー通過順位の見方")
+    st.text_area("レース別馬メモ", height=100)
+    st.button("🔮 実際の着順・ハナ争いと照合して復習", width="stretch" if hasattr(st, "width") else None)
 
-# --- 2-B. 右側のメイン画面処理 ---
-# セッション状態または直接の入力からデータを取得
-copypaste_data = copypaste_input if copypaste_input else st.session_state.get("copypaste_input")
 
-if copypaste_data:
-    st.success("コピペデータのパースに成功しました。")
+# --- 2-B. メインエリア（右側画面） ---
+st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
+st.write("")
+
+# 画面を綺麗に2分割（コピペ入力 vs 投資指示書＆全頭診断）
+col1, col2 = st.columns([1, 1])
+
+# 【左カラム：入力エリア】
+with col1:
+    st.header("📋 地方競馬 過去馬柱・オッズ混在 テキスト入力")
+    st.text_input("🔗 地方レースURL（netkeiba等）")
     
-    # スクショの「投資指示書 & 復習ルーム連動表示」ヘッダーを完全復元
-    st.markdown("# 📊 投資指示書 & 復習ルーム連動表示")
-    st.write("=== 予想生成日時: 2026-05-25 01:27:06 === 🧠 地方バイアス: JRA（中央競馬）および地方競馬の高速馬場・トラックバイアス、芝・ダートのキレ、走破タイム理論（基準タイム・馬場補正）、上がり3F、展開・ハナ争いを統合解析せよ。")
+    copypaste_input = st.text_area(
+        "✍️ 地方競馬コピペデータ", 
+        value="1\nダンカーク\nチュウオーハーン\n(パワフルラリマー)\n2\nワールドエース\nデコラス\n(デコラス)", # サンプル初期値
+        height=450
+    )
+
+# 【右カラム：投資指示書 ＆ 全頭診断（2枚目のスクショ通りに右側に配置）】
+with col2:
+    st.header("📊 投資指示書 & 復習ルーム連動表示")
+    st.write("=== 予想生成日時: 2026-05-25 01:27:06 ===")
+    st.write("🧠 **地方バイアス**: JRA（中央競馬）および地方競馬の高速馬場・トラックバイアス、芝・ダートのキレ、走破タイム理論（基準タイム・馬場補正）、上がり3F、展開・ハナ争いを統合解析せよ。")
     st.write("---")
     
-    # 復元したテーブルを描画
-    final_table_md = parse_and_generate_table(copypaste_data)
-    st.markdown(final_table_md, unsafe_html=True)
-else:
-    # データが空の時の待機画面
-    st.info("左側のサイドバーにレースデータを貼り付けてください。")
+    # データを貼り付けた、あるいは初期値がある場合にテーブルを描画
+    if copypaste_input:
+        final_table_md = parse_and_generate_table(copypaste_input)
+        st.markdown(final_table_md, unsafe_html=True)
+    else:
+        st.info("左側の入力エリアにレースデータを貼り付けてください。")
