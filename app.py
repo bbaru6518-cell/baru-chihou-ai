@@ -19,7 +19,6 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
     スクリーンショットのデザイン・列構成（父・母・脚質・人気・評価・理由）を完全再現する関数
     """
     if ai_recommendations is None:
-        # スクリーショトに記載されている実際の馬と解析データのモック
         ai_recommendations = {
             1: {"mother": "パワフルラリマー", "sand": "速砂〇", "style": "先行 📢", "pop": "2", "eval": "〇", "reason": "2走前に同条件(不良)を先行策で圧勝。最内枠から再現可能。"},
             2: {"mother": "デコラス", "sand": "標準", "style": "追込", "pop": "12", "eval": "消", "reason": "追い込み一手で展開利見込めず。近走内容も平凡。"},
@@ -28,14 +27,12 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
             5: {"mother": "アドマイヤジョイ", "sand": "標準", "style": "差し", "pop": "7", "eval": "消", "reason": "C3クラスで頭打ち。強調材料に欠ける。"},
         }
 
-    # スクリーンショット1枚目のヘッダーデザインを完全復元
     markdown_lines = [
         "### 📊 全頭精密診断・地方ダート適性リスト\n",
         "| 馬番 | 馬名 | 父 | 母 | ダート砂適性 | 脚質 | 人気 | 評価 | 理由 |",
         "| :---: | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :--- |"
     ]
 
-    # 改行コードでブロックを分割
     horse_blocks = re.split(r'\n(?=\d+\s+\d+\s+(?:--|✓))', raw_text)
 
     for block in horse_blocks:
@@ -106,39 +103,4 @@ with st.sidebar:
     )
     st.caption("コーナー通過順位の見方")
     st.text_area("レース別馬メモ", height=100)
-    
-    # 確実かつ安全な横幅いっぱいの設定に戻しました
-    st.button("🔮 実際の着順・ハナ争いと照合して復習", use_container_width=True)
-
-
-# --- 2-B. メインエリア（右側画面） ---
-st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
-st.write("")
-
-# 画面を綺麗に2分割（コピペ入力 vs 投資指示書＆全頭診断）
-col1, col2 = st.columns([1, 1])
-
-# 【左カラム：入力エリア】
-with col1:
-    st.header("📋 地方競馬 過去馬柱・オッズ混在 テキスト入力")
-    st.text_input("🔗 地方レースURL（netkeiba等）")
-    
-    copypaste_input = st.text_area(
-        "✍️ 地方競馬コピペデータ", 
-        value="1\nダンカーク\nチュウオーハーン\n(パワフルラリマー)\n2\nワールドエース\nデコラス\n(デコラス)", # サンプル初期値
-        height=450
-    )
-
-# 【右カラム：投資指示書 ＆ 全頭診断（2枚目のスクショ通りに右側に配置）】
-with col2:
-    st.header("📊 投資指示書 & 復習ルーム連動表示")
-    st.write("=== 予想生成日時: 2026-05-25 01:27:06 ===")
-    st.write("🧠 **地方バイアス**: JRA（中央競馬）および地方競馬の高速馬場・トラックバイアス、芝・ダートのキレ、走破タイム理論（基準タイム・馬場補正）、上がり3F、展開・ハナ争いを統合解析せよ。")
-    st.write("---")
-    
-    # データを貼り付けた、あるいは初期値がある場合にテーブルを描画
-    if copypaste_input:
-        final_table_md = parse_and_generate_table(copypaste_input)
-        st.markdown(final_table_md, unsafe_html=True)
-    else:
-        st.info("左側の
+    st.button("🔮 実際の着順・ハナ争いと照合して復習", use_container_
