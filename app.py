@@ -103,4 +103,4 @@ with st.sidebar:
     )
     st.caption("コーナー通過順位の見方")
     st.text_area("レース別馬メモ", height=100)
-    st.button("🔮 実際の着順・ハナ争いと照合して復習", use_container_
+    st.button("🔮 実際の着順・ハナ争いと照合して復習")
