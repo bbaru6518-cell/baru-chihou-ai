@@ -94,8 +94,13 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
 if "copypaste_input" in st.session_state and st.session_state.copypaste_input:
     st.success("コピペデータのパースに成功しました。")
     
-    # 変換実行
-    final_table_md = parse_and_generate_table(st.session_state.copypaste_input)
-    
-    # テーブルを描画
-    st.markdown(final_table_md
+# 変換実行
+# もしAIの解析結果データ（辞書型）が別にあるなら、第2引数にそれを渡します
+# 例として、変数名が「ai_analysis_result」の場合：
+final_table_md = parse_and_generate_table(
+    st.session_state.copypaste_input, 
+    ai_recommendations=ai_analysis_result  # ←ここを実際のAI評価データ変数に変える
+)
+
+# テーブルを描画
+st.markdown(final_table_md, unsafe_html=True)
