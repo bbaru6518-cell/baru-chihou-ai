@@ -98,8 +98,11 @@ if "copypaste_input" in st.session_state and st.session_state.copypaste_input:
 # もしAIの解析結果データ（辞書型）が別にあるなら、第2引数にそれを渡します
 # 例として、変数名が「ai_analysis_result」の場合：
 final_table_md = parse_and_generate_table(
-# --- StreamlitのUI部分での呼び出し例 ---
-# 「.get()」を使って、キーが存在しない場合でも安全に処理を流す設計に変えます
+# （この上には関数の定義や、テキストエリアなどの st.text_area("...", key="copypaste_input") がある想定です）
+
+# ==========================================
+# 🛑 ここから下が差し替えるコードです！
+# ==========================================
 
 # st.session_state の中身を安全にチェック（存在しない場合は None を返す）
 copypaste_data = st.session_state.get("copypaste_input")
@@ -107,7 +110,7 @@ copypaste_data = st.session_state.get("copypaste_input")
 if copypaste_data:
     st.success("コピペデータのパースに成功しました。")
     
-    # 変換実行
+    # 変換実行（カッコも綺麗に閉じています！）
     final_table_md = parse_and_generate_table(copypaste_data)
     
     # テーブルを描画
