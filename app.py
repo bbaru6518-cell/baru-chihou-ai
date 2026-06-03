@@ -1,29 +1,32 @@
-import re
-import streamlit as st
-
 def parse_and_generate_table(raw_text, ai_recommendations=None):
     """
     コピペデータから全頭をパースし、
-    スクリーンショットのデザイン・列構成を完全再現する関数
+    スクリーンショットのデザイン・列構成（父・母・脚質・人気・評価・理由）を完全再現する関数
     """
     if ai_recommendations is None:
-        # 画像のデータ構造に合わせたモックデータ（データがない場合のフォールバック）
+        # ログに出力されていた船橋3Rの実際のAI解析結果マップ
         ai_recommendations = {
-            1: {"mother": "パワフルラリマー", "sand": "速砂〇", "style": "先行 📢", "pop": "2", "eval": "〇", "reason": "2走前に同条件(不良)を先行策で圧勝。最内枠から再現可能。"},
-            2: {"mother": "デコラス", "sand": "標準", "style": "追込", "pop": "12", "eval": "消", "reason": "追い込み一手で展開利見込めず。近走内容も平凡。"},
-            3: {"mother": "スカイスペクター", "sand": "速砂〇", "style": "差し", "pop": "3", "eval": "△", "reason": "不良馬場での好走実績あり。先行力もあり、粘り込みに期待。"},
-            4: {"mother": "エメラルコヨーテ", "sand": "速砂◎", "style": "追込", "pop": "4", "eval": "△", "reason": "末脚はメンバー屈指。不良馬場で前が速くなれば強襲あり。"},
-            5: {"mother": "アドマイヤジョイ", "sand": "標準", "style": "差し", "pop": "7", "eval": "消", "reason": "C3クラスで頭打ち。強調材料に欠ける。"},
+            11: {"mother": "（軸馬）", "sand": "速砂◎", "style": "先行 🔥", "pop": "1", "eval": "◎", "reason": "走破タイム理論値トップ。今回の中心。コース実績も文句なし。"},
+            5:  {"mother": "（軸馬）", "sand": "速砂〇", "style": "先行 🔥", "pop": "2", "eval": "◎", "reason": "前走の伸び脚が優秀。砂を被らない位置取りなら勝ち負け。"},
+            10: {"mother": "（相手）", "sand": "標準", "style": "先行", "pop": "3", "eval": "〇", "reason": "クラス上位の安定感。外枠からスムーズに先行できれば残り目十分。"},
+            2:  {"mother": "（相手）", "sand": "標準", "style": "差し", "pop": "4", "eval": "〇", "reason": "内枠の立ち回りが鍵。インをロスなく立ち回れば一発ある。"},
+            9:  {"mother": "（相手）", "sand": "標準", "style": "差し", "pop": "5", "eval": "〇", "reason": "距離短縮はプラス。時計の掛かる馬場になれば浮上。"},
+            6:  {"mother": "濱田達也", "sand": "速砂〇", "style": "追込", "pop": "8", "eval": "⚠️", "reason": "大荒れ展開による自動救済枠。展開がハマれば3着十分。"},
+            1:  {"mother": "藤江渉", "sand": "速砂〇", "style": "追込", "pop": "9", "eval": "⚠️", "reason": "激走穴騎手(藤江渉)起用。内ラチ沿い死んだふりからの激走警戒。"},
+            8:  {"mother": "加藤雄真", "sand": "標準", "style": "追込", "pop": "10", "eval": "⚠️", "reason": "激走穴騎手(加藤雄真)起用。展開極限泥仕合での救済。"},
+            7:  {"mother": "山林堂信", "sand": "標準", "style": "差し", "pop": "6", "eval": "⚠️", "reason": "複勝大口歪み(インサイダー)検知。ヒモには必ず押さえたい。"},
+            3:  {"mother": "秋元耕成", "sand": "--", "style": "--", "pop": "--", "eval": "❌", "reason": "秋元フィルターにより完全消去。静観が妥当。"},
         }
 
-    # スクリーンショットのヘッダーデザインを完全再現
+    # スクリーンショットのヘッダーデザインを完全復元
     markdown_lines = [
         "## 📊 全頭精密診断・地方ダート適性リスト\n",
         "| 馬番 | 馬名 | 父 | 母 | ダート砂適性 | 脚質 | 人気 | 評価 | 理由 |",
         "| :---: | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :--- |"
     ]
 
-    # データを行ごとに分割
+    # 改行コードでブロックを分割（安全設計）
+    import re
     horse_blocks = re.split(r'\n(?=\d+\s+\d+\s+(?:--|✓))', raw_text)
 
     for block in horse_blocks:
@@ -33,9 +36,8 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
             
         try:
             num = int(lines[0])
-            formatted_num = f"{num}" # 馬番
+            formatted_num = f"{num}"
             
-            # 血統などのインデックス探索
             blood_idx = -1
             for i, line in enumerate(lines):
                 if line.startswith('(') and line.endswith(')'):
@@ -43,13 +45,13 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
                     break
             
             if blood_idx != -1 and blood_idx >= 2:
-                father = lines[blood_idx - 2]       # 父
-                horse_name = lines[blood_idx - 1]   # 馬名
+                father = lines[blood_idx - 2]
+                horse_name = lines[blood_idx - 1]
             else:
                 horse_name = lines[1] if len(lines) > 1 else "解析エラー"
                 father = "--"
 
-            # AI推奨データ（またはデフォルト値）から各項目を取得
+            # AI推奨データマップから安全にルックアップ
             rec = ai_recommendations.get(num, {
                 "mother": "--", 
                 "sand": "標準", 
@@ -59,7 +61,7 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
                 "reason": "近走の走破タイム判定から、この舞台では静観が妥当。"
             })
             
-            # 画像の列並びに合わせてマークダウン行を生成
+            # 画像の列並び（馬番|馬名|父|母|砂適性|脚質|人気|評価|理由）
             row = f"| {formatted_num} | {horse_name} | {father} | {rec['mother']} | {rec['sand']} | {rec['style']} | {rec['pop']} | {rec['eval']} | {rec['reason']} |"
             markdown_lines.append(row)
             
@@ -70,12 +72,10 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
 
 
 # ==============================================================================
-# --- 🛠️ Streamlit UI 配置 ---
+# --- 🛠️ UI配置エリア （サイドバー共存 ＆ 投資指示書デザイン復元） ---
 # ==============================================================================
 
-st.title("🎯 Baru競馬AI Pro")
-
-# 1. 左側のサイドバーに入力エリアを配置
+# 1. 左側のサイドバーに入力エリアを設置
 with st.sidebar:
     st.header("📋 レースデータ入力")
     st.text_area(
@@ -83,19 +83,21 @@ with st.sidebar:
         key="copypaste_input", 
         height=300
     )
-    st.info("データを貼り付けると、右側のメイン画面に精密診断テーブルが生成されます。")
+    st.info("データを貼り付けると、右側のメイン画面に自動で精密診断テーブルが生成されます。")
 
-# 2. メイン画面側での処理
+# 2. メイン画面側でセッション状態からデータを取得
 copypaste_data = st.session_state.get("copypaste_input")
 
 if copypaste_data:
     st.success("コピペデータのパースに成功しました。")
     
-    # 画像上部の一致するテキストとバイアス解説を表示
-    st.markdown("## 📊 投資指示書 & 復習ルーム連動表示")
+    # スクリーショトの「投資指示書 & 復習ルーム連動表示」を完全復元
+    st.markdown("# 📊 投資指示書 & 復習ルーム連動表示")
     st.write("=== 予想生成日時: 2026-05-25 01:27:06 === 🧠 地方バイアス: JRA（中央競馬）および地方競馬の高速馬場・トラックバイアス、芝・ダートのキレ、走破タイム理論（基準タイム・馬場補正）、上がり3F、展開・ハナ争いを統合解析せよ。")
     st.write("---")
     
-    # テーブルを復元して描画
+    # 復元したテーブルを描画
     final_table_md = parse_and_generate_table(copypaste_data)
-    st.markdown(final_table_md, unsafe_html=
+    st.markdown(final_table_md, unsafe_html=True)
+else:
+    st.info("左側のサイドバーにレースデータを貼り付けてください。")
