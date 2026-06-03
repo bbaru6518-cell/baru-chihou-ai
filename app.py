@@ -106,7 +106,9 @@ with st.sidebar:
     )
     st.caption("コーナー通過順位の見方")
     st.text_area("レース別馬メモ", height=100)
-    st.button("🔮 実際の着順・ハナ争いと照合して復習", width="stretch" if hasattr(st, "width") else None)
+    
+    # 確実かつ安全な横幅いっぱいの設定に戻しました
+    st.button("🔮 実際の着順・ハナ争いと照合して復習", use_container_width=True)
 
 
 # --- 2-B. メインエリア（右側画面） ---
@@ -139,4 +141,4 @@ with col2:
         final_table_md = parse_and_generate_table(copypaste_input)
         st.markdown(final_table_md, unsafe_html=True)
     else:
-        st.info("左側の入力エリアにレースデータを貼り付けてください。")
+        st.info("左側の
