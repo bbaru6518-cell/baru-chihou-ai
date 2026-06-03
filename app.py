@@ -3,328 +3,146 @@ import streamlit as st
 import google.generativeai as genai
 import json
 import os
-import requests
-from bs4 import BeautifulSoup
 import datetime
 
-# ページの設定（2カラムを綺麗に表示するためにワイドモードに設定）
-st.set_page_config(layout="wide", page_title="Baru 地方競馬AI Pro")
+# --- 設定（ワイドモードで2画面構成を美しく配置） ---
+LOG_DIR = "racing_logs_chihou"
+os.makedirs(LOG_DIR, exist_ok=True)
+st.set_page_config(page_title="Baru 地方競馬AI Pro", layout="wide")
 
 # ==============================================================================
-# 1. 精密診断Markdownテーブル生成関数
+# 1. ⚙️ サイドバー：過去ログ・結果復習ルーム
 # ==============================================================================
-def parse_and_generate_table(raw_text, ai_recommendations=None):
-    """
-    コピペデータから全頭をパースし、
-    スクリーンショットのデザイン・列構成（父・母・脚質・人気・評価・理由）を完全再現する関数
-    """
-    if ai_recommendations is None:
-        ai_recommendations = {
-            1: {"mother": "パワフルラリマー", "sand": "速砂〇", "style": "先行 📢", "pop": "2", "eval": "〇", "reason": "2走前に同条件(不良)を先行策で圧勝。最内枠から再現可能。"},
-            2: {"mother": "デコラス", "sand": "標準", "style": "追込", "pop": "12", "eval": "消", "reason": "追い込み一手で展開利見込めず。近走内容も平凡。"},
-            3: {"mother": "スカイスペクター", "sand": "速砂〇", "style": "差し", "pop": "3", "eval": "△", "reason": "不良馬場での好走実績あり。先行力もあり、粘り込みに期待。"},
-            4: {"mother": "エメラルコヨーテ", "sand": "速砂◎", "style": "追込", "pop": "4", "eval": "△", "reason": "末脚はメンバー屈指。不良馬場で前が速くなれば強襲あり。"},
-            5: {"mother": "アドマイヤジョイ", "sand": "標準", "style": "差し", "pop": "7", "eval": "消", "reason": "C3クラスで頭打ち。強調材料に欠ける。"},
-        }
-
-    markdown_lines = [
-        "### 📊 全頭精密診断・地方ダート適性リスト\n",
-        "| 馬番 | 馬名 | 父 | 母 | ダート砂適性 | 脚質 | 人気 | 評価 | 理由 |",
-        "| :---: | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :--- |"
-    ]
-
-    horse_blocks = re.split(r'\n(?=\d+\s+\d+\s+(?:--|✓))', raw_text)
-
-    for block in horse_blocks:
-        lines = [line.strip() for line in block.split('\n') if line.strip()]
-        if not lines or not re.match(r'^\d+$', lines[0]):
-            continue
-
-        try:
-            num = int(lines[0])
-            formatted_num = f"{num}"
-
-            blood_idx = -1
-            for i, line in enumerate(lines):
-                if line.startswith('(') and line.endswith(')'):
-                    blood_idx = i
-                    break
-
-            if blood_idx != -1 and blood_idx >= 2:
-                father = lines[blood_idx - 2]
-                horse_name = lines[blood_idx - 1]
-            else:
-                horse_name = lines[1] if len(lines) > 1 else "解析エラー"
-                father = "--"
-
-            rec = ai_recommendations.get(num, {
-                "mother": "--",
-                "sand": "標準",
-                "style": "差し",
-                "pop": "--",
-                "eval": "△",
-                "reason": "近走の走破タイム判定から、この舞台では静観が妥当。"
-            })
-
-            row = f"| {formatted_num} | {horse_name} | {father} | {rec['mother']} | {rec['sand']} | {rec['style']} | {rec['pop']} | {rec['eval']} | {rec['reason']} |"
-            markdown_lines.append(row)
-
-        except Exception:
-            continue
-
-    return "\n".join(markdown_lines)
-
-
-# ==============================================================================
-# 2. Gemini API 呼び出し関数
-# ==============================================================================
-def call_gemini(prompt: str, api_key: str) -> str:
-    """Gemini APIを呼び出してレスポンスを返す"""
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"⚠️ API呼び出しエラー: {e}"
-
-
-# ==============================================================================
-# 3. URLからデータ取得関数
-# ==============================================================================
-def fetch_race_data_from_url(url: str) -> str:
-    """指定URLからレースデータを取得する"""
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers, timeout=10)
-        res.raise_for_status()
-        soup = BeautifulSoup(res.text, "html.parser")
-        return soup.get_text(separator="\n", strip=True)[:5000]
-    except Exception as e:
-        return f"⚠️ URL取得エラー: {e}"
-
-
-# ==============================================================================
-# 4. セッション状態の初期化
-# ==============================================================================
-if "prediction_result" not in st.session_state:
-    st.session_state.prediction_result = ""
-if "table_result" not in st.session_state:
-    st.session_state.table_result = ""
-if "review_result" not in st.session_state:
-    st.session_state.review_result = ""
-if "past_logs" not in st.session_state:
-    st.session_state.past_logs = [
-        "ファイナルレース(C3)_2026-05-25",
-        "大井11R_東京ダービー",
-    ]
-
-
-# ==============================================================================
-# 5. ⚙️ Streamlit UI 配置
-# ==============================================================================
-
-# --- 5-A. 左側サイドバー ---
 with st.sidebar:
     st.button("💾 設定保存")
     st.write("")
-
     st.header("📂 過去ログ・結果復習ルーム")
     st.caption("復習・確認する過去の予想")
-    selected_log = st.selectbox(
-        "選択してください",
-        st.session_state.past_logs,
-        label_visibility="collapsed"
-    )
-    if st.button("📖 予想指示書を呼び出す"):
-        st.session_state.prediction_result = f"【{selected_log}】の予想指示書を呼び出しました。\n\n（ここに保存済み予想が表示されます）"
+    
+    # 過去ログファイルの取得
+    log_files = sorted([f for f in os.listdir(LOG_DIR) if f.endswith(".txt")], reverse=True)
+    if log_files:
+        selected_log = st.selectbox("予想ログ選択", log_files, label_visibility="collapsed")
+        if st.button("📖 予想指示書を呼び出す"):
+            with open(os.path.join(LOG_DIR, selected_log), "r", encoding="utf-8") as f:
+                st.session_state["res"] = f.read()
+            st.rerun()
+    else:
+        st.info("過去ログはまだありません")
 
     st.write("---")
+
+    # レース結果コピペ投入エリア（機能完全維持）
     st.header("🏁 レース結果のコピペ投入")
     st.caption("💡 1行目にレース名を入力し、2行目から結果を丸ごとコピペしてください！")
-    result_paste = st.text_area(
-        "1行目：レース名／2行目〜：結果コピペ",
-        value="レース名\n1着：馬名\n2着：馬名\n3着：馬名",
-        height=150,
-        label_visibility="collapsed"
-    )
+    race_result_input = st.text_area("1行目：レース名／2行目〜：結果コピペ", height=150, label_visibility="collapsed")
     st.caption("コーナー通過順位の見方")
-    with st.expander("📌 コーナー通過順位の見方"):
-        st.write("""
-        - 数字=通過順位
-        - 括弧内=複数頭が同順位
-        - 例: 3=(1,2),4,5 → 3コーナーで1,2番が並走
-        """)
-
-    memo_text = st.text_area("レース別馬メモ", height=100)
-
-    if st.button("🔮 実際の着順・ハナ争いと照合して復習"):
-        if result_paste.strip():
-            st.session_state.review_result = f"### 🔍 復習結果\n\n入力データ:\n```\n{result_paste}\n```\n\n**分析**: ハナ争いと着順の照合を実行しました。（Gemini API連携で詳細分析が可能です）"
+    st.text_area("レース別馬メモ", height=100)
+    
+    # API KEYの入力（隠し入力）
+    api_key = st.text_input("Gemini API KEY", type="password", placeholder="AI解析に必須です")
+    
+    # 互換性エラーの起きない安全なボタン幅設定
+    if st.button("🔮 実際の着順・ハナ争いと照合して復習", use_container_width=True):
+        if not api_key:
+            st.error("APIキーを入力してください")
+        elif not race_result_input:
+            st.error("結果データをコピペしてください")
+        elif "res" not in st.session_state:
+            st.error("まずメイン画面で過去ログを呼び出すか、予想を実行して『現在の予想指示書』を表示させてください")
         else:
-            st.warning("結果データを入力してください")
-
-    st.write("---")
-    # API Key設定（折りたたみ）
-    with st.expander("⚙️ API設定"):
-        api_key = st.text_input("Gemini API Key", type="password", placeholder="AIza...")
-        st.caption("Google AI StudioでAPIキーを取得してください")
-
-
-# --- 5-B. メインエリア ---
-st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
-
-# 2カラムレイアウト
-col_left, col_right = st.columns([1, 1])
-
-# ============================================================
-# 左カラム：入力エリア
-# ============================================================
-with col_left:
-    st.subheader("📋 地方競馬 過去馬柱・オッズ混在テキスト入力")
-
-    # URL入力
-    race_url = st.text_input(
-        "🔗 地方レースURL（netkeiba等）",
-        placeholder="https://nar.netkeiba.com/race/..."
-    )
-    if race_url and st.button("🌐 URLからデータ取得"):
-        with st.spinner("データ取得中..."):
-            fetched = fetch_race_data_from_url(race_url)
-            st.session_state["fetched_url_data"] = fetched
-            st.success("取得完了！下のテキストエリアに反映されました")
-
-    # コピペ入力エリア
-    default_paste = st.session_state.get("fetched_url_data", "")
-    paste_data = st.text_area(
-        "🔥 地方競馬コピペデータ",
-        value=default_paste,
-        height=400,
-        placeholder="netkeiba等からコピーした馬柱データをここに貼り付けてください...\n\n例:\n1 チュウオーハーン\nダンカーク\n(パワフルラリマー)\n..."
-    )
-
-    # 予想生成ボタン
-    btn_col1, btn_col2 = st.columns(2)
-    with btn_col1:
-        gen_button = st.button("🚀 AI予想を生成する", type="primary", use_container_width=True)
-    with btn_col2:
-        table_button = st.button("📊 全頭診断テーブル生成", use_container_width=True)
-
-    # テーブル生成（ローカル処理）
-    if table_button:
-        if paste_data.strip():
-            with st.spinner("テーブル生成中..."):
-                result = parse_and_generate_table(paste_data)
-                st.session_state.table_result = result
-        else:
-            st.warning("馬柱データを入力してください")
-
-    # AI予想生成
-    if gen_button:
-        if not paste_data.strip():
-            st.warning("馬柱データを入力してください")
-        else:
-            gemini_key = st.session_state.get("api_key_stored", "")
-            # サイドバーのAPI keyを取得
             try:
-                gemini_key = api_key
-            except Exception:
-                gemini_key = ""
+                with st.spinner("実際のレース結果と照合し、反省会を実施中..."):
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    
+                    review_prompt = f"""
+                    【総監督からの命令：レース結果の答え合わせと徹底反省】
+                    
+                    あなたが先ほど出力した【予想指示書】と、実際に発生した【レース結果・着順】を照合し、以下の基準で猛反省（回顧）を行え。
+                    
+                    1. 軸馬（◎, ○, ▲）の成否
+                       - 軸に据えた馬は馬券圏内（3着以内）にきたか？
+                       - netkeibaの「データ上位馬3頭」の信頼度はどうだったか？
+                    
+                    2. 「死んだふり下剋上穴馬」の生存確認
+                       - あなたが「上がり最速爆弾馬」や「激走警戒馬（注）」として救済・指名した不人気馬の実際の着順・上がり3Fを確認せよ。
+                       - 実際に激走したか？ 凡走した場合、展開（スローペース等）やトラックバイアスがどう影響したか推測せよ。
+                    
+                    3. 展開・ハナ争いの答え合わせ
+                       - 事前に想定したハナ争いやペース（ハイ・ミドル・スロー）は、実際の展開と一致していたか？
+                    
+                    【提出された現在の予想指示書】
+                    {st.session_state["res"]}
+                    
+                    【実際のレース結果（コピペデータ）】
+                    {race_result_input}
+                    
+                    【出力フォーマット】
+                    ### 🏁 {race_result_input.splitlines()[0] if race_result_input.splitlines() else '対象レース'} - 統合反省レポート
+                    - **総合評価**: （例：大的中 / 軸は合致も紐抜け / 展開不一致による大敗 など）
+                    
+                    #### 📊 着順答え合わせ
+                    | 印 | 馬名 | 事前評価 | 実際の着順 | 上がり3F（結果） | 反省・要因分析 |
+                    | --- | --- | --- | --- | --- | --- |
+                    
+                    #### 🧠 次回に向けたロジック修正点（総監督への進言）
+                    - （教訓を箇条書きで書くこと）
+                    """
+                    response = model.generate_content(review_prompt)
+                    st.session_state["res"] = response.text
+                st.rerun()
+            except Exception as e:
+                st.error(f"反省解析エラー: {e}")
 
-            if not gemini_key:
-                st.warning("⚙️ API設定からGemini APIキーを入力してください")
-            else:
-                with st.spinner("🤖 AIが分析中...（しばらくお待ちください）"):
+# ==============================================================================
+# 2. 🏛️ メインエリア：スクショ通りの2連カラムレイアウト
+# ==============================================================================
+st.title("🏇 Baru 地方競馬AI Pro - 【Ver 24.8.5 高速・軽量化安定版】")
+st.write("")
+
+# 画面を綺麗に左右2分割
+col1, col2 = st.columns([1, 1])
+
+# --- 2-A. 左側：データ入力・送信セクション ---
+with col1:
+    st.header("📋 地方競馬 過去馬柱・オッズ混在 テキスト入力")
+    st.text_input("🔗 地方レースURL（netkeiba等）")
+    
+    manual_data = st.text_area(
+        "✍️ 地方競馬コピペデータ（データ分析傾向も含む）", 
+        placeholder="ここに馬柱データやnetkeibaの分析テキストを貼り付けてください",
+        height=450
+    )
+    
+    if st.button("🚀 統合解析実行", use_container_width=True):
+        if not api_key: 
+            st.error("APIキーを入力してください（サイドバー下部、または設定欄）")
+        elif not manual_data:
+            st.error("解析するレースデータを入力してください")
+        else:
+            try:
+                with st.spinner("地方ダート・走破タイム理論 統合解析中..."):
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    
+                    # 地方競馬専用・スクショのテーブルヘッダーを強制出力させるプロンプト
                     prompt = f"""
-あなたは地方競馬の専門AIアナリストです。
-以下の馬柱データを分析し、全頭の地方ダート適性・脚質・評価・買い推奨をJSON形式で出力してください。
+                    【今回の馬柱・オッズデータ（netkeiba分析情報含む）】
+                    {manual_data}
+                    
+                    【統合解析基準】
+                    - JRAおよび地方競馬の高速馬場・トラックバイアス、芝・ダートのキレ、走破タイム理論（基準タイム・馬場補正）、上がり3F、展開・ハナ争いを統合解析せよ。
+                    
+                    【⚙️ 総監督絶対厳守ロジック：netkeibaデータ傾向スクリーニング】
+                    1. 投入されたデータ内に「データ上位馬3頭」というセクションがある場合、そこに名前がある馬はクラス・条件への地力高いと判断し、軸馬・相手筆頭（◎, 〇, ▲）の最有力候補として評価パラメータを大きく加算せよ。
+                    2. データ内の「今回の馬場状態が得意な馬」「今回のレース間隔で実績がある馬」「この競馬場が得意な馬」のいずれかの項目に該当する不人気馬（目安：単勝5番人気以下）を発見した場合は、近走着順がどれだけ悪くても「消し」評価にすることを厳禁とし、必ず【穴候補・紐（△または注）】として救済・格納せよ。
 
-【出力形式】
-{{
-  "race_info": "レース概要",
-  "bias": "馬場バイアス分析",
-  "recommendations": {{
-    "1": {{"mother": "母馬名", "sand": "速砂◎/速砂○/標準/重馬場△", "style": "脚質", "pop": "人気想定", "eval": "◎/○/▲/△/消", "reason": "理由"}},
-    ...
-  }},
-  "buy_order": ["◎馬番", "○馬番", "▲馬番"],
-  "strategy": "投資戦略メモ"
-}}
+                    【⚙️ 総監督絶対厳守ロジック：死んだふり下剋上馬（上がり最速爆弾）の検知】
+                    近走成績が崩れていても、以下の「激走ファクター」を満たす伏兵馬は、展開（ミドル〜ハイペース）がハマった瞬間に上がり最速で下剋上を起こす爆弾馬として自動検知せよ。
+                    - 条件A：過去2〜3走以内に、敗れてはいるが「上がり3Fタイムがメンバー中1位または2位」の隠れた強烈な末脚・スタミナ実績がある馬。
+                    - 条件B：前走が短い距離（マイル以下）で大敗しており、今回スタミナが問われる長距離（1800m〜2000m以上）へと大幅に距離延長してきた馬（追走ペースが楽になり、道中死んだふりから3〜4コーナーでの捲り差しが炸裂するパターン）。
+                    - 上記に該当する馬は、展開利による激走警戒馬（注）として評価し、3連複フォーメーション等の3列目（紐）に必ず強制配置せよ。
 
-【馬柱データ】
-{paste_data[:3000]}
-"""
-                    result_text = call_gemini(prompt, gemini_key)
-
-                    # JSON解析試行
-                    try:
-                        # コードブロックを除去
-                        clean = re.sub(r'```json|```', '', result_text).strip()
-                        ai_data = json.loads(clean)
-                        recs = ai_data.get("recommendations", {})
-                        # 数値キーに変換
-                        recs_int = {int(k): v for k, v in recs.items()}
-                        table_md = parse_and_generate_table(paste_data, recs_int)
-
-                        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        st.session_state.prediction_result = f"""=== 予想生成日時: {now} ===
-🌸 地方バイアス: {ai_data.get('bias', '分析中')}
-
-{ai_data.get('strategy', '')}
-
-{table_md}
-"""
-                        st.session_state.table_result = table_md
-
-                    except json.JSONDecodeError:
-                        # JSON解析失敗時はそのまま表示
-                        st.session_state.prediction_result = result_text
-
-                    st.success("✅ AI予想が生成されました！")
-
-# ============================================================
-# 右カラム：出力エリア
-# ============================================================
-with col_right:
-    st.subheader("📈 投資指示書 & 復習ルーム連動表示")
-
-    # 予想結果表示
-    if st.session_state.prediction_result:
-        st.markdown(st.session_state.prediction_result)
-    else:
-        # デモ表示
-        now_demo = "2026-05-25 01:27:06"
-        st.markdown(f"""
-=== 予想生成日時: {now_demo} === 🌸 地方バイアス: JRA（中央競馬）および地方競馬の高速馬場・トラックバイアス、芝・ダートのキレ、走破タイム理論（基準タイム・馬場補正）、上がり3F、展開・ハナ争いを統合解析せよ。
-""")
-
-    st.write("---")
-
-    # 全頭診断テーブル表示
-    st.subheader("📊 全頭精密診断・地方ダート適性リスト")
-    if st.session_state.table_result:
-        st.markdown(st.session_state.table_result)
-    else:
-        # デモテーブル
-        demo_table = """
-| 馬番 | 馬名 | 父 | 母 | ダート砂適性 | 脚質 | 人気 | 評価 | 理由 |
-| :---: | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| 1 | チュウオーハーン | ダンカーク | パワフルラリマー | 速砂〇 | 先行 📢 | 2 | 〇 | 2走前に同条件(不良)を先行策で圧勝。最内枠から再現可能。 |
-| 2 | デコラス | ワールドエース | デコラス | 標準 | 追込 | 12 | 消 | 追い込み一手で展開利見込めず。近走内容も平凡。 |
-| 3 | スカイスペクター | モーニン | スカイスペクター | 速砂〇 | 差し | 3 | △ | 不良馬場での好走実績あり。先行力もあり、粘り込みに期待。 |
-| 4 | エメラルコヨーテ | ドレフォン | エメラルコヨーテ | 速砂◎ | 追込 | 4 | △ | 末脚はメンバー屈指。不良馬場で前が速くなれば強襲あり。 |
-| 5 | アドマイヤジョイ | シルバーステート | アドマイヤジョイ | 標準 | 差し | 7 | 消 | C3クラスで頭打ち。強調材料に欠ける。 |
-"""
-        st.markdown(demo_table)
-
-    st.write("---")
-
-    # 復習結果表示
-    if st.session_state.review_result:
-        st.markdown(st.session_state.review_result)
-
-    # 手動テーブル更新ボタン
-    if st.button("🔄 テーブルを更新"):
-        if paste_data.strip():
-            st.session_state.table_result = parse_and_generate_table(paste_data)
-            st.rerun()
+                    【地方ダート・出力テーブル厳守指示】
+                    全頭診断は、必ず以下の列構成（血統情報を含む）のMarkdownテーブルのみで出力せよ。
