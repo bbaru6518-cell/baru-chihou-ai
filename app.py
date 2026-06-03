@@ -6,19 +6,19 @@ import requests
 import streamlit as st
 from bs4 import BeautifulSoup
 
-# ⭕ 現在のサーバー環境に100%入っている古い方のライブラリに戻して、インポートエラーを回避
+# 【サーバー環境連動】安定稼働する旧ライブラリ形式
 import google.generativeai as genai
 
-# ページレイアウトの設定
+# ページレイアウトの設定（ワイドモードで広く使う）
 st.set_page_config(page_title="Baru地方競馬AI Pro", layout="wide")
 
 # APIキーの取得と設定
 api_key = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY"))
 if not api_key:
-    st.error("API KEY ERROR")
+    st.error("API KEY ERROR: StreamlitのSecretsを設定してください。")
     st.stop()
 
-# サーバーに合わせた形式でGeminiを初期化
+# Geminiの初期化
 genai.configure(api_key=api_key)
 
 
@@ -93,33 +93,38 @@ def generate_barus_formation(race_df, netkeiba_top3, wave_score):
 
 
 # ==============================================================================
-# Streamlit UI 画面構築
+# 👈 左側：サイドバー設定エリア
 # ==============================================================================
-st.title("🎯 Baru地方競馬AI Pro")
-st.subheader("〜 走破タイム理論 × netkeibaデータ分析救済 〜")
+st.sidebar.markdown("## 📋 1. 出走馬データ入力")
+race_title = st.sidebar.text_input("レース名", "船橋 3R")
+wave_input = st.sidebar.slider("波乱度スコア", 0, 100, 65)
 
-col1, col2 = st.columns(2)
+default_text = "11 アイディアル 御神本\n05 ジョーエスポワール 笹川\n10 コスモミツボシ 矢野\n02 シャマル 川田\n09 ウインアザレア 森\n06 濱田達也 濱田\n01 藤江渉 藤江\n08 加藤雄真 加藤\n07 山林堂信 山林堂\n03 秋元耕成 秋元"
+raw_horse_data = st.sidebar.text_area("馬データ", default_text)
 
-with col1:
-    st.markdown("### 📋 1. 出走馬データ入力")
-    race_title = st.text_input("レース名", "船橋 3R")
-    wave_input = st.slider("波乱度スコア", 0, 100, 65)
-
-    default_text = "11 アイディアル 御神本\n05 ジョーエスポワール 笹川\n10 コスモミツボシ 矢野\n02 シャマル 川田\n09 ウインアザレア 森\n06 濱田達也 濱田\n01 藤江渉 藤江\n08 加藤雄真 加藤\n07 山林堂信 山林堂\n03 秋元耕成 秋元"
-    raw_horse_data = st.text_area("馬データ", default_text)
-
-with col2:
-    st.markdown("### 📊 2. netkeibaデータ入力")
-    top3_input = st.text_input("1枚目:データ分析上位3頭(カンマ区切り)", "1, 10, 12")
-    himo_input = st.text_input("2枚目:コース距離得意馬(カンマ区切り)", "6, 1, 8, 7")
+st.sidebar.markdown("## 📊 2. netkeibaデータ入力")
+top3_input = st.sidebar.text_input(
+    "1枚目:データ分析上位3頭(カンマ区切り)", "1, 10, 12"
+)
+himo_input = st.sidebar.text_input(
+    "2枚目:コース距離得意馬(カンマ区切り)", "6, 1, 8, 7"
+)
 
 # カンマ区切りの文字列をリストに変換
 try:
     netkeiba_top3 = [int(x.strip()) for x in top3_input.split(",") if x.strip()]
     netkeiba_himo = [int(x.strip()) for x in himo_input.split(",") if x.strip()]
 except ValueError:
-    st.error("入力は半角数字とカンマのみにしてください")
+    st.sidebar.error("入力は半角数字とカンマのみにしてください")
     st.stop()
+
+
+# ==============================================================================
+# 👉 右側：メイン表示エリア（解析結果）
+# ==============================================================================
+st.title("🎯 Baru地方競馬AI Pro")
+st.subheader("〜 走破タイム理論 × netkeibaデータ分析救済 〜")
+st.markdown("---")
 
 # パース処理を実行してDataFrameを作成
 lines = raw_horse_data.split("\n")
@@ -138,7 +143,7 @@ for line in lines:
         horse_list.append(parsed)
         score_idx += 1
 
-# ボタンが押されたら解析エンジンを起動（警告対策としてwidth='stretch'の代わりにTrueまたは省略）
+# ボタンが押されたら解析エンジンを起動（サイドバーの下ではなくメイン側に大きく配置）
 if st.button("🚀 レース解析エンジンを起動", use_container_width=True):
     if not horse_list:
         st.warning("馬データが読み込めませんでした")
@@ -191,7 +196,13 @@ if st.button("🚀 レース解析エンジンを起動", use_container_width=Tr
                         if comb not in tickets:
                             tickets.append(comb)
 
+        # 2列で見やすく表示
+        t_col1, t_col2 = st.columns(2)
         for i, t in enumerate(tickets, 1):
-            st.write(f"[{i:02d}] {t[0]}-{t[1]}-{t[2]}")
+            if i % 2 != 0:
+                t_col1.write(f"**[{i:02d}]** `{t[0]}-{t[1]}-{t[2]}`")
+            else:
+                t_col2.write(f"**[{i:02d}]** `{t[0]}-{t[1]}-{t[2]}`")
 
-        st.success(f"合計購入点数: {len(tickets)} 点")
+        st.markdown("---")
+        st.success(f"🔥 合計購入点数: {len(tickets)} 点")
