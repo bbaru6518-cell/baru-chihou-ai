@@ -68,19 +68,30 @@ def parse_and_generate_table(raw_text, ai_recommendations=None):
 
 
 # ==============================================================================
-# --- UI表示エリア（ここを完全クリーン化しました） ---
+# --- 🛠️ Streamlit UI 配置（サイドバーの復活） ---
 # ==============================================================================
 
-# 1. ユーザーからのテキスト入力を受け取るエリア（既存のキー名に連動）
-st.text_area("netkeiba等の馬柱データを貼り付けてください", key="copypaste_input", height=200)
+# タイトル
+st.title("🎯 Baru競馬AI Pro")
 
-# 2. セッション状態から安全にデータを取得
+# 1. 左側のサイドバーを生成し、そこに入力エリアを配置する
+with st.sidebar:
+    st.header("📋 レースデータ入力")
+    # 💥 ここを st.sidebar 内に入れることで、サイドバーの中にテキストエリアが復活します！
+    st.text_area(
+        "netkeiba等の馬柱データを貼り付けてください", 
+        key="copypaste_input", 
+        height=300
+    )
+    st.info("データを貼り付けると、右側のメイン画面に自動で精密診断テーブルが生成されます。")
+
+# 2. メイン画面側でセッション状態からデータを取得
 copypaste_data = st.session_state.get("copypaste_input")
 
-# 3. データが存在する場合のみパースしてテーブルを描画
+# 3. データが存在する場合のみメイン画面にテーブルを描画
 if copypaste_data:
     st.success("コピペデータのパースに成功しました。")
     final_table_md = parse_and_generate_table(copypaste_data)
     st.markdown(final_table_md, unsafe_html=True)
 else:
-    st.info("サイドバーまたは入力エリアにレースデータを貼り付けてください。")
+    st.info("左側のサイドバーにレースデータを貼り付けてください。")
